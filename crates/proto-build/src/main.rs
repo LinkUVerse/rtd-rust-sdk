@@ -15,11 +15,11 @@ mod message_graph;
 fn main() {
     let root_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"));
     let proto_dir = root_dir
-        .join("../sui-rpc/vendored/proto")
+        .join("../rtd-rpc/vendored/proto")
         .canonicalize()
         .unwrap();
     let out_dir = root_dir
-        .join("../sui-rpc/src/proto/generated")
+        .join("../rtd-rpc/src/proto/generated")
         .canonicalize()
         .unwrap();
 
@@ -59,11 +59,11 @@ fn main() {
         .build_client(true)
         .build_server(true)
         .bytes(".")
-        .boxed(".sui.rpc.v2.Input.literal")
-        .boxed(".sui.rpc.v2.Epoch.system_state")
+        .boxed(".rtd.rpc.v2.Input.literal")
+        .boxed(".rtd.rpc.v2.Epoch.system_state")
         .boxed("json")
-        .message_attribute(".sui.rpc", "#[non_exhaustive]")
-        .enum_attribute(".sui.rpc", "#[non_exhaustive]")
+        .message_attribute(".rtd.rpc", "#[non_exhaustive]")
+        .enum_attribute(".rtd.rpc", "#[non_exhaustive]")
         .btree_map(".")
         .out_dir(&out_dir)
         .compile_fds(fds.clone())
@@ -102,7 +102,7 @@ fn main() {
         .out_dir(&out_dir)
         .ignore_unknown_fields()
         .btree_map(["."])
-        .build(&[".google.rpc", ".sui"])
+        .build(&[".google.rpc", ".rtd"])
         .unwrap();
 
     for (package, fds) in packages {

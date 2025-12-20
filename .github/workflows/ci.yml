@@ -69,7 +69,7 @@ jobs:
       - name: clippy
         run: make clippy
 
-      - run: make -C crates/sui-rpc proto
+      - run: make -C crates/rtd-rpc proto
 
       - run: make is-dirty
 
