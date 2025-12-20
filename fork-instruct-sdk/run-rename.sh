@@ -46,7 +46,7 @@ find . -type f \( -name "*.rs" -o -name "*.toml" -o -name "*.md" -o -name "*.yam
     -exec sed -i '' 's/SUI/RTD/g' {} \; 2>/dev/null || true
 
 # 5. 替换 Sui (混合大小写)
-echo "  替换 Sui -> RTD..."
+echo "  替换 Sui -> Rtd..."
 find . -type f \( -name "*.rs" -o -name "*.toml" -o -name "*.md" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" -o -name "*.proto" \) \
     ! -path "./.git/*" ! -path "./target/*" \
     -exec sed -i '' 's/Sui/Rtd/g' {} \; 2>/dev/null || true
