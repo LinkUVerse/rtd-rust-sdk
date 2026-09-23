@@ -35,7 +35,7 @@ pub struct Epoch {
 }
 
 impl Client {
-    /// Get the chain identifier (e.g., "35834a8a" for mainnet).
+    /// Get the connected network's chain identifier (its genesis checkpoint digest).
     ///
     /// # Example
     ///

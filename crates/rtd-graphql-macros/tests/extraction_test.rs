@@ -12,10 +12,10 @@ fn test_simple_path() {
     }
 
     let json = serde_json::json!({
-        "chainIdentifier": "4c78adac"
+        "chainIdentifier": "test-chain-identifier"
     });
     let data = ChainInfo::from_value(json).unwrap();
-    assert_eq!(data.chain_id, "4c78adac");
+    assert_eq!(data.chain_id, "test-chain-identifier");
 }
 
 #[test]
@@ -70,13 +70,13 @@ fn test_field_named_value_does_not_shadow_response_value() {
     }
 
     let json = serde_json::json!({
-        "chainIdentifier": "4c78adac",
+        "chainIdentifier": "test-chain-identifier",
         "checkpoint": {
             "digest": "abc123"
         }
     });
     let data = Data::from_value(json).unwrap();
-    assert_eq!(data.value, "4c78adac");
+    assert_eq!(data.value, "test-chain-identifier");
     assert_eq!(data.digest, "abc123");
 }
 
@@ -127,7 +127,7 @@ fn test_flattened_fields_receive_complete_response() {
     }
 
     let json = serde_json::json!({
-        "chainIdentifier": "4c78adac",
+        "chainIdentifier": "test-chain-identifier",
         "epoch": {
             "epochId": 42
         }
@@ -137,14 +137,14 @@ fn test_flattened_fields_receive_complete_response() {
     assert_eq!(
         data.value,
         ChainInfo {
-            chain_id: "4c78adac".to_string(),
+            chain_id: "test-chain-identifier".to_string(),
         }
     );
     assert_eq!(data.epoch, EpochInfo { epoch_id: 42 });
     assert_eq!(
         data.extract_only,
         ExtractOnly {
-            chain_id: "4c78adac".to_string(),
+            chain_id: "test-chain-identifier".to_string(),
         }
     );
 }

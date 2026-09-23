@@ -10,12 +10,14 @@
 - 对源码中的长 Base64/Base64URL 字符串做保护；随机编码数据可能恰巧含有 `SUI`，替换会破坏 Passkey/BCS 测试向量。
 - `*.fds.bin` 是 protobuf 二进制描述符，不能只改文件名。必须从重命名后的 `.proto` 重新生成，使反射包名为 `rtd.*`。
 - Bech32 私钥样本的校验和绑定 HRP，`suiprivkey` 不能简单替换前缀；固定样本已按 `rtdprivkey` 重新计算校验和。zkLogin 上游固定证明包含已签名/Base64 编码的 issuer 与 kid，因此测试用 JWK 键仍需匹配原始证明；它们是不可机械改写的历史测试样本，不是 RTD 默认服务地址。
+- 上游 GraphQL 文档与宏提取测试仍有旧网络 Chain ID 样本。运行 `neutralize-chain-id-examples.py` 将它们改为网络无关的描述和明确的测试占位符。RTD 链 ID 由新 genesis 生成，不能将旧示例当作 RTD 主网固定值。
 - 原 `rollback.sh` 包含 `git reset --hard` 和 `git clean -fd`，不用于本次迁移。使用 Git 分支审阅或回退。
 
 ## 可重现操作
 
 ```bash
 python3 fork-instruct-sdk/refresh-current-upstream.py
+python3 fork-instruct-sdk/neutralize-chain-id-examples.py
 cargo run -p proto-build
 cargo fmt --all
 cargo fmt --all -- --check
