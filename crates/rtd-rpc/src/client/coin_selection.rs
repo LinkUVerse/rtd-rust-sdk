@@ -5,10 +5,10 @@ use crate::proto::rtd::rpc::v2::ListOwnedObjectsRequest;
 use crate::proto::rtd::rpc::v2::Object;
 use futures::StreamExt;
 use prost_types::FieldMask;
-use std::str::FromStr;
 use rtd_sdk_types::Address;
 use rtd_sdk_types::StructTag;
 use rtd_sdk_types::TypeTag;
+use std::str::FromStr;
 
 impl Client {
     /// Selects coins of a specific type owned by an address until the total value meets the required amount.

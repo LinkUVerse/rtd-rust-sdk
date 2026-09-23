@@ -1,10 +1,15 @@
-use crate::descriptor::{Package, TypePath};
+use crate::descriptor::Package;
+use crate::descriptor::TypePath;
+use crate::escape::ident_from_escaped;
+use proc_macro2::TokenStream;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
     extern_types: &'a [(String, String)],
     retain_enum_prefix: bool,
     package: &'a Package,
+    serde_path: &'a TokenStream,
 }
 
 impl<'a> Resolver<'a> {
@@ -13,12 +18,19 @@ impl<'a> Resolver<'a> {
         extern_types: &'a [(String, String)],
         package: &'a Package,
         retain_enum_prefix: bool,
+        serde_path: &'a TokenStream,
     ) -> Self {
         Resolver {
             extern_types,
             package,
             retain_enum_prefix,
+            serde_path,
         }
+    }
+
+    /// Returns the configured serde module path (e.g. `crate::_serde`).
+    pub fn serde_path(&self) -> &TokenStream {
+        self.serde_path
     }
 
     /// Lookup an extern type, returns the rust path followed by the number of
@@ -86,6 +98,18 @@ impl<'a> Resolver<'a> {
         ret
     }
 
+    /// Returns the rust type for `path` as a `TokenStream`.
+    pub fn rust_type_token(&self, path: &TypePath) -> TokenStream {
+        let s = self.rust_type(path);
+        TokenStream::from_str(&s).unwrap_or_else(|e| panic!("invalid rust type `{s}`: {e}"))
+    }
+
+    /// Returns the variant ident for an enum variant as a `syn::Ident`.
+    pub fn rust_variant_ident(&self, enumeration: &TypePath, variant: &str) -> proc_macro2::Ident {
+        let s = self.rust_variant(enumeration, variant);
+        ident_from_escaped(&s)
+    }
+
     pub fn rust_variant(&self, enumeration: &TypePath, variant: &str) -> String {
         use heck::ToUpperCamelCase;
         let variant = variant.to_upper_camel_case();
@@ -109,6 +133,7 @@ impl<'a> Resolver<'a> {
 mod tests {
     use super::*;
     use crate::descriptor::TypeName;
+    use quote::quote;
 
     #[test]
     fn test_resolver() {
@@ -121,7 +146,8 @@ mod tests {
                 "foo::bar::Buz".to_string(),
             ),
         ];
-        let resolver = Resolver::new(extern_types, &resolver_package, false);
+        let serde_path = quote!(crate::_serde);
+        let resolver = Resolver::new(extern_types, &resolver_package, false, &serde_path);
 
         // A type in the same package
         let same_type = TypePath::new(resolver_package.clone()).child(TypeName::new("Foo"));
@@ -179,8 +205,9 @@ mod tests {
     #[test]
     // https://github.com/influxdata/pbjson/issues/48
     fn test_resolver_shared_prefix_false_match() {
+        let serde_path = quote!(crate::_serde);
         assert_eq!(
-            Resolver::new(&[], &Package::new("test.api.v1"), false).rust_type(
+            Resolver::new(&[], &Package::new("test.api.v1"), false, &serde_path).rust_type(
                 &TypePath::new(Package::new("test.domain.v1"))
                     .child(TypeName::new("Foo"))
                     .child(TypeName::new("Bar"))
@@ -192,7 +219,8 @@ mod tests {
     #[test]
     fn test_variant() {
         let package = Package::new("test.syntax3");
-        let resolver = Resolver::new(&[], &package, false);
+        let serde_path = quote!(crate::_serde);
+        let resolver = Resolver::new(&[], &package, false, &serde_path);
 
         let tests = [
             ("MyEnum", "MyEnumFoo", "Foo"),

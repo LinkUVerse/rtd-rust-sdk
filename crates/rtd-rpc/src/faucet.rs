@@ -1,9 +1,9 @@
 use reqwest::StatusCode;
+use rtd_sdk_types::Address;
+use rtd_sdk_types::Digest;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
-use rtd_sdk_types::Address;
-use rtd_sdk_types::Digest;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 

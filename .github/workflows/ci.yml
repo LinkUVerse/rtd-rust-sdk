@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |
@@ -26,6 +26,45 @@ jobs:
           cargo --version
 
       - uses: taiki-e/install-action@cargo-nextest
+
+      # install rtd
+      - name: Install Rtd Binary
+        run: |
+          # Get latest testnet release that has ubuntu binary available
+          echo "Detecting latest Rtd testnet version with ubuntu binary..."
+          RTD_VERSION=$(curl -s https://api.github.com/repos/LinkUVerse/rtd/releases | \
+            jq -r '.[] | select(.tag_name | startswith("testnet-")) |
+                   select(.assets[].name | contains("ubuntu-x86_64")) |
+                   .tag_name' | head -n 1)
+
+          if [ -z "$RTD_VERSION" ]; then
+            echo "Failed to detect testnet version, falling back to testnet-v1.63.1"
+            RTD_VERSION="testnet-v1.63.1"
+          fi
+
+          echo "Installing Rtd binary ${RTD_VERSION}..."
+
+          wget https://github.com/LinkUVerse/rtd/releases/download/${RTD_VERSION}/rtd-${RTD_VERSION}-ubuntu-x86_64.tgz || {
+            echo "Failed to download Rtd ${RTD_VERSION}"
+            exit 1
+          }
+
+          echo "Extracting Rtd binary..."
+          tar -xzf rtd-*.tgz ./rtd
+
+          # Move rtd binary to PATH
+          echo "Installing Rtd binary..."
+          sudo mv rtd /usr/local/bin/
+
+          # Cleanup
+          rm -f rtd-*.tgz
+
+          # Verify installation
+          echo "Verifying Rtd installation..."
+          rtd --version
+
+          # Export RTD_BINARY for tests
+          echo "RTD_BINARY=/usr/local/bin/rtd" >> $GITHUB_ENV
 
       - name: Run tests
         run: make test
@@ -37,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |
@@ -56,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |
@@ -78,7 +117,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |
@@ -95,7 +134,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |
@@ -117,7 +156,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: rust version
         run: |

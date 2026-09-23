@@ -1,3 +1,38 @@
+# [0.4.0] - 2026-09-09
+
+## Changed
+- update rtd-sdk-types to 0.4.0
+
+# [0.3.1] - 2026-07-16
+
+## Added
+- [#254] `from_rtdprivkey` and `to_rtdprivkey` on `SimpleKeypair`,
+  `Ed25519PrivateKey`, `Secp256k1PrivateKey`, and `Secp256r1PrivateKey` for
+  the Rtd CLI's `rtdprivkey` Bech32 key format, behind the new `bech32`
+  feature
+- [#281] `from_base64` and `to_base64` on the same key types for the legacy
+  Base64 keystore key format (available whenever the corresponding key scheme
+  feature is enabled), plus `SimpleVerifiyingKey::derive_address`
+- [#282] zklogin v2 circuit support: `ZkLoginCircuitMode` and the
+  `circuit_mode`/`set_circuit_mode` accessors on `ZkloginVerifier`; the
+  default mode remains v1-only
+
+[#254]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/254
+[#281]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/281
+[#282]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/282
+
+# [0.3.0] - 2026-03-23
+
+## Fixed
+- [#227] replace panicking unwraps with proper error handling in zklogin verify
+
+[#227]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/227
+
+# [0.2.0] - 2026-01-05
+
+## Changed
+- Updated rtd-sdk-types to 0.2.0
+
 # [0.1.0] - 2025-11-07
 
 ## Changed
@@ -22,8 +57,8 @@
 
 - Update to use version 0.0.7 of `rtd-sdk-types`
 
-[`e6d79e1a`]: https://github.com/linkulabs/rtd-rust-sdk/commit/e6d79e1a
-[`68bb4ede`]: https://github.com/linkulabs/rtd-rust-sdk/commit/68bb4ede
+[`e6d79e1a`]: https://github.com/linkuverse/rtd-rust-sdk/commit/e6d79e1a
+[`68bb4ede`]: https://github.com/linkuverse/rtd-rust-sdk/commit/68bb4ede
 
 # [0.0.6] - 2025-07-16
 
@@ -35,7 +70,7 @@
 
 - Added support for verifying passkeys in multisigs ([`6d7fab8`])
 
-[`6d7fab8`]: https://github.com/linkulabs/rtd-rust-sdk/commit/6d7fab81c214d9f27555de8a2b8b47233ae9f655
+[`6d7fab8`]: https://github.com/linkuverse/rtd-rust-sdk/commit/6d7fab81c214d9f27555de8a2b8b47233ae9f655
 
 ## Changed
 - Update to use version 0.0.5 of `rtd-sdk-types`
@@ -58,22 +93,26 @@
 - Added a `SimpleKeypair` type which could be either an ed25519, secp256k1, or secp256r1 keypair ([`8d64c06`])
 - Added support for verifying passkey authenticators ([#81])
 
-[#25]: https://github.com/linkulabs/rtd-rust-sdk/pull/25
-[`bc481a1`]: https://github.com/linkulabs/rtd-rust-sdk/commit/bc481a1ea156e6ccb528b5b49e62a511be5ba60a
-[`df32a46`]: https://github.com/linkulabs/rtd-rust-sdk/commit/df32a46bfbecbbbf4ec7e9c1974eef0916ccd359
-[`8d64c06`]: https://github.com/linkulabs/rtd-rust-sdk/commit/8d64c06628b9494c674c27158ce74036fe45080e
+[#25]: https://github.com/linkuverse/rtd-rust-sdk/pull/25
+[`bc481a1`]: https://github.com/linkuverse/rtd-rust-sdk/commit/bc481a1ea156e6ccb528b5b49e62a511be5ba60a
+[`df32a46`]: https://github.com/linkuverse/rtd-rust-sdk/commit/df32a46bfbecbbbf4ec7e9c1974eef0916ccd359
+[`8d64c06`]: https://github.com/linkuverse/rtd-rust-sdk/commit/8d64c06628b9494c674c27158ce74036fe45080e
 [#81]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/81
 
 # [0.0.1] - 2024-09-25
 
 Initial release
 
-[0.1.0]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.1.0
-[0.0.8]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.8
-[0.0.7]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.7
-[0.0.6]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.6
-[0.0.5]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.5
-[0.0.4]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.4
-[0.0.3]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.3
-[0.0.2]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.2
-[0.0.1]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.1
+[0.4.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.4.0
+[0.3.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.3.1
+[0.3.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.3.0
+[0.2.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.2.0
+[0.1.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.1.0
+[0.0.8]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.8
+[0.0.7]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.7
+[0.0.6]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.6
+[0.0.5]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.5
+[0.0.4]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.4
+[0.0.3]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.3
+[0.0.2]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.2
+[0.0.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-crypto-0.0.1

@@ -4,13 +4,18 @@
 //! This module therefore extracts a slightly less obtuse representation of a
 //! message that can be used by the code generation logic
 
-use prost_types::{
-    field_descriptor_proto::{Label, Type},
-    FieldDescriptorProto,
-};
+use prost_types::field_descriptor_proto::Label;
+use prost_types::field_descriptor_proto::Type;
+use prost_types::FieldDescriptorProto;
 
-use crate::descriptor::{Descriptor, DescriptorSet, MessageDescriptor, Syntax, TypeName, TypePath};
-use crate::escape::{escape_ident, escape_type};
+use crate::descriptor::Descriptor;
+use crate::descriptor::DescriptorSet;
+use crate::descriptor::MessageDescriptor;
+use crate::descriptor::Syntax;
+use crate::descriptor::TypeName;
+use crate::descriptor::TypePath;
+use crate::escape::escape_ident;
+use crate::escape::escape_type;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ScalarType {
@@ -38,6 +43,11 @@ impl ScalarType {
             Self::String => "String",
             Self::Bytes => "Vec<u8>",
         }
+    }
+
+    pub fn rust_type_token(&self) -> proc_macro2::TokenStream {
+        use std::str::FromStr;
+        proc_macro2::TokenStream::from_str(self.rust_type()).unwrap()
     }
 
     pub fn is_numeric(&self) -> bool {

@@ -1,9 +1,9 @@
 use crate::SignatureError;
 use crate::secp256r1::Secp256r1VerifyingKey;
-use signature::Verifier;
 use rtd_sdk_types::PasskeyAuthenticator;
 use rtd_sdk_types::SimpleSignature;
 use rtd_sdk_types::UserSignature;
+use signature::Verifier;
 
 #[derive(Default, Clone, Debug)]
 pub struct PasskeyVerifier {}

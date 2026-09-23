@@ -229,11 +229,55 @@ impl From<rtd_sdk_types::TransactionExpiration> for TransactionExpiration {
                 });
                 TransactionExpirationKind::ValidDuring
             }
+            Validity {
+                min_epoch,
+                max_epoch,
+                min_timestamp,
+                max_timestamp,
+                chain,
+                nonce,
+                allowed_proposers,
+            } => {
+                message.epoch = max_epoch;
+                message.min_epoch = min_epoch;
+                message.set_chain(chain);
+                message.set_nonce(nonce);
+                message.min_timestamp = min_timestamp.map(|seconds| prost_types::Timestamp {
+                    seconds: seconds as _,
+                    nanos: 0,
+                });
+                message.max_timestamp = max_timestamp.map(|seconds| prost_types::Timestamp {
+                    seconds: seconds as _,
+                    nanos: 0,
+                });
+                if let Some(allowed_proposers) = allowed_proposers {
+                    message.set_allowed_proposers(AllowedProposers::from(allowed_proposers));
+                }
+                TransactionExpirationKind::Validity
+            }
             _ => TransactionExpirationKind::Unknown,
         };
 
         message.set_kind(kind);
         message
+    }
+}
+
+impl From<rtd_sdk_types::AllowedProposers> for AllowedProposers {
+    fn from(value: rtd_sdk_types::AllowedProposers) -> Self {
+        let mut message = Self::default();
+        message.set_epoch(value.epoch);
+        message.proposers = value.proposers;
+        message
+    }
+}
+
+impl From<&AllowedProposers> for rtd_sdk_types::AllowedProposers {
+    fn from(value: &AllowedProposers) -> Self {
+        Self {
+            epoch: value.epoch(),
+            proposers: value.proposers.clone(),
+        }
     }
 }
 
@@ -270,6 +314,25 @@ impl TryFrom<&TransactionExpiration> for rtd_sdk_types::TransactionExpiration {
                     .nonce_opt()
                     .ok_or_else(|| TryFromProtoError::missing("nonce"))?,
             },
+            TransactionExpirationKind::Validity => Self::Validity {
+                min_epoch: value.min_epoch_opt(),
+                max_epoch: value.epoch_opt(),
+                min_timestamp: value
+                    .min_timestamp_opt()
+                    .map(|timestamp| timestamp.seconds as _),
+                max_timestamp: value
+                    .max_timestamp_opt()
+                    .map(|timestamp| timestamp.seconds as _),
+                chain: value
+                    .chain_opt()
+                    .ok_or_else(|| TryFromProtoError::missing("chain"))?
+                    .parse()
+                    .map_err(|e| TryFromProtoError::invalid("chain", e))?,
+                nonce: value
+                    .nonce_opt()
+                    .ok_or_else(|| TryFromProtoError::missing("nonce"))?,
+                allowed_proposers: value.allowed_proposers_opt().map(Into::into),
+            },
         }
         .pipe(Ok)
     }
@@ -298,9 +361,9 @@ impl From<rtd_sdk_types::TransactionKind> for TransactionKind {
             K::ProgrammableTransaction(ptb) => message
                 .with_programmable_transaction(ptb)
                 .with_kind(Kind::ProgrammableTransaction),
-            // K::ProgrammableSystemTransaction(ptb) => message
-            //     .with_programmable_transaction(ptb)
-            //     .with_kind(Kind::ProgrammableSystemTransaction),
+            K::ProgrammableSystemTransaction(ptb) => message
+                .with_programmable_transaction(ptb)
+                .with_kind(Kind::ProgrammableSystemTransaction),
             K::ChangeEpoch(change_epoch) => message
                 .with_change_epoch(change_epoch)
                 .with_kind(Kind::ChangeEpoch),
@@ -376,6 +439,9 @@ impl TryFrom<&TransactionKind> for rtd_sdk_types::TransactionKind {
             }
             Kind::ConsensusCommitPrologueV4 => {
                 Self::ConsensusCommitPrologueV4(value.consensus_commit_prologue().try_into()?)
+            }
+            Kind::ProgrammableSystemTransaction => {
+                Self::ProgrammableSystemTransaction(value.programmable_transaction().try_into()?)
             }
         }
         .pipe(Ok)
@@ -1205,6 +1271,12 @@ impl From<rtd_sdk_types::EndOfEpochTransactionKind> for EndOfEpochTransactionKin
             K::CoinRegistryCreate => message.with_kind(Kind::CoinRegistryCreate),
             K::DisplayRegistryCreate => message.with_kind(Kind::DisplayRegistryCreate),
             K::AddressAliasStateCreate => message.with_kind(Kind::AddressAliasStateCreate),
+            K::WriteAccumulatorStorageCost { storage_cost } => message
+                .with_kind(Kind::WriteAccumulatorStorageCost)
+                .with_storage_cost(storage_cost),
+            K::ForwardingAddressRegistryCreate => {
+                message.with_kind(Kind::ForwardingAddressRegistryCreate)
+            }
             _ => message,
         }
     }
@@ -1245,6 +1317,12 @@ impl TryFrom<&EndOfEpochTransactionKind> for rtd_sdk_types::EndOfEpochTransactio
             Kind::CoinRegistryCreate => Self::CoinRegistryCreate,
             Kind::DisplayRegistryCreate => Self::DisplayRegistryCreate,
             Kind::AddressAliasStateCreate => Self::AddressAliasStateCreate,
+            Kind::WriteAccumulatorStorageCost => Self::WriteAccumulatorStorageCost {
+                storage_cost: value.storage_cost_opt().ok_or_else(|| {
+                    TryFromProtoError::missing(EndOfEpochTransactionKind::STORAGE_COST_FIELD)
+                })?,
+            },
+            Kind::ForwardingAddressRegistryCreate => Self::ForwardingAddressRegistryCreate,
         }
         .pipe(Ok)
     }
@@ -1684,6 +1762,10 @@ impl From<rtd_sdk_types::FundsWithdrawal> for FundsWithdrawal {
         let mut message = Self::default();
         message.set_coin_type(value.coin_type());
         message.set_source(value.source().into());
+        if let rtd_sdk_types::WithdrawFrom::SenderAllowance { funder, allowance } = value.source() {
+            message.set_funder(funder.to_string());
+            message.set_allowance(allowance.to_string());
+        }
         message.amount = value.amount();
         message
     }
@@ -1707,6 +1789,19 @@ impl TryFrom<&FundsWithdrawal> for rtd_sdk_types::FundsWithdrawal {
             Source::Unknown => return Err(TryFromProtoError::invalid("source", "unknown source")),
             Source::Sender => rtd_sdk_types::WithdrawFrom::Sender,
             Source::Sponsor => rtd_sdk_types::WithdrawFrom::Sponsor,
+            Source::SenderAllowance => {
+                let funder = value
+                    .funder_opt()
+                    .ok_or_else(|| TryFromProtoError::missing("funder"))?
+                    .parse()
+                    .map_err(|e| TryFromProtoError::invalid(FundsWithdrawal::FUNDER_FIELD, e))?;
+                let allowance = value
+                    .allowance_opt()
+                    .ok_or_else(|| TryFromProtoError::missing("allowance"))?
+                    .parse()
+                    .map_err(|e| TryFromProtoError::invalid(FundsWithdrawal::ALLOWANCE_FIELD, e))?;
+                rtd_sdk_types::WithdrawFrom::SenderAllowance { funder, allowance }
+            }
         };
 
         Ok(Self::new(amount, coin_type, source))
@@ -1718,6 +1813,7 @@ impl From<rtd_sdk_types::WithdrawFrom> for funds_withdrawal::Source {
         match value {
             rtd_sdk_types::WithdrawFrom::Sender => Self::Sender,
             rtd_sdk_types::WithdrawFrom::Sponsor => Self::Sponsor,
+            rtd_sdk_types::WithdrawFrom::SenderAllowance { .. } => Self::SenderAllowance,
             _ => Self::Unknown,
         }
     }

@@ -37,7 +37,7 @@ pub struct DescriptorGraph {
 }
 
 impl DescriptorGraph {
-    pub(crate) fn new<'a>(files: impl Iterator<Item = &'a FileDescriptorProto>) -> DescriptorGraph {
+    pub fn new<'a>(files: impl Iterator<Item = &'a FileDescriptorProto>) -> DescriptorGraph {
         let mut graph = DescriptorGraph {
             index: BTreeMap::new(),
             graph: Graph::new(),
@@ -250,7 +250,7 @@ impl<'a> FileParser<'a> {
                     assert_eq!("key", key.name());
                     assert_eq!("value", value.name());
 
-                    let name = format!("{}.{}", &type_name, nested_type.name());
+                    let name = format!("{}.{}", type_name, nested_type.name());
                     Either::Right((name, (key, value)))
                 } else {
                     Either::Left((nested_type.clone(), idx))

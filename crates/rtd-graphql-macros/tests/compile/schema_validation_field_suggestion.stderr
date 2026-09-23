@@ -1,0 +1,5 @@
+error: Field 'chainIdentifer' not found on type 'Query'. Did you mean 'chainIdentifier'?
+ --> tests/compile/schema_validation_field_suggestion.rs:7:20
+  |
+7 |     #[field(path = "chainIdentifer")]
+  |                    ^^^^^^^^^^^^^^^^

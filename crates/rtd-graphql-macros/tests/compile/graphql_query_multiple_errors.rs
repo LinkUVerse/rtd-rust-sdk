@@ -1,0 +1,17 @@
+//! trybuild compile-fail: a mix of one valid field and two invalid ones
+//! should produce two separate rustc errors (one per Bluejay diagnostic), not
+//! a single combined message.
+
+use rtd_graphql_macros::graphql_query;
+
+const Q: &str = graphql_query!(
+    "query {
+        chainIdentifier
+        foo
+        bar
+    }"
+);
+
+fn main() {
+    let _ = Q;
+}

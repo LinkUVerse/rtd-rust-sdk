@@ -6,7 +6,7 @@ syntax = "proto3";
 package rtd.rpc.v2;
 
 // `Bcs` contains an arbitrary type that is serialized using the
-// [BCS](https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/index.html#bcs)
+// [BCS](https://linkuverse.github.io/rtd-rust-sdk/rtd_sdk_types/index.html#bcs)
 // format as well as a name that identifies the type of the serialized value.
 message Bcs {
   // Name that identifies the type of the serialized value.

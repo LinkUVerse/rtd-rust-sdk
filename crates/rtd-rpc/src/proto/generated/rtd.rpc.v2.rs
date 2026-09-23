@@ -80,7 +80,7 @@ pub struct BalanceChange {
     pub amount: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// `Bcs` contains an arbitrary type that is serialized using the
-/// [BCS](<https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/index.html#bcs>)
+/// [BCS](<https://linkuverse.github.io/rtd-rust-sdk/rtd_sdk_types/index.html#bcs>)
 /// format as well as a name that identifies the type of the serialized value.
 #[non_exhaustive]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -368,7 +368,7 @@ pub struct TransactionEffects {
 }
 /// Input/output state of an object that was changed during execution.
 #[non_exhaustive]
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChangedObject {
     /// ID of the object.
     #[prost(string, optional, tag = "1")]
@@ -538,8 +538,19 @@ pub mod changed_object {
         }
     }
 }
+/// An entry in an event digest accumulator value.
 #[non_exhaustive]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct EventDigestEntry {
+    /// Index of the event within its transaction.
+    #[prost(uint64, optional, tag = "1")]
+    pub event_index: ::core::option::Option<u64>,
+    /// Digest of the event.
+    #[prost(string, optional, tag = "2")]
+    pub digest: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccumulatorWrite {
     #[prost(string, optional, tag = "1")]
     pub address: ::core::option::Option<::prost::alloc::string::String>,
@@ -551,8 +562,20 @@ pub struct AccumulatorWrite {
         tag = "3"
     )]
     pub operation: ::core::option::Option<i32>,
+    #[prost(enumeration = "accumulator_write::AccumulatorValue", optional, tag = "4")]
+    pub value_kind: ::core::option::Option<i32>,
+    /// Set when the accumulator value is an integer (value_kind = INTEGER).
     #[prost(uint64, optional, tag = "5")]
-    pub value: ::core::option::Option<u64>,
+    pub integer_value: ::core::option::Option<u64>,
+    /// Set, with len 2, when the accumulator value is an integer tuple
+    /// (value_kind = INTEGER_TUPLE).
+    #[prost(uint64, repeated, tag = "6")]
+    pub integer_tuple: ::prost::alloc::vec::Vec<u64>,
+    /// Set when the accumulator value is an event digest list (value_kind = EVENT_DIGEST).
+    /// Contains a non-empty list of (event_index, digest) pairs representing
+    /// authenticated event stream entries within a transaction.
+    #[prost(message, repeated, tag = "7")]
+    pub event_digest_value: ::prost::alloc::vec::Vec<EventDigestEntry>,
 }
 /// Nested message and enum types in `AccumulatorWrite`.
 pub mod accumulator_write {
@@ -592,6 +615,49 @@ pub mod accumulator_write {
                 "ACCUMULATOR_OPERATION_UNKNOWN" => Some(Self::Unknown),
                 "MERGE" => Some(Self::Merge),
                 "SPLIT" => Some(Self::Split),
+                _ => None,
+            }
+        }
+    }
+    #[non_exhaustive]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum AccumulatorValue {
+        Unknown = 0,
+        Integer = 1,
+        IntegerTuple = 2,
+        EventDigest = 3,
+    }
+    impl AccumulatorValue {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unknown => "ACCUMULATOR_VALUE_UNKNOWN",
+                Self::Integer => "INTEGER",
+                Self::IntegerTuple => "INTEGER_TUPLE",
+                Self::EventDigest => "EVENT_DIGEST",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "ACCUMULATOR_VALUE_UNKNOWN" => Some(Self::Unknown),
+                "INTEGER" => Some(Self::Integer),
+                "INTEGER_TUPLE" => Some(Self::IntegerTuple),
+                "EVENT_DIGEST" => Some(Self::EventDigest),
                 _ => None,
             }
         }
@@ -776,6 +842,25 @@ pub struct Event {
     /// JSON rendering of the event.
     #[prost(message, optional, boxed, tag = "6")]
     pub json: ::core::option::Option<::prost::alloc::boxed::Box<::prost_types::Value>>,
+    /// The sequence number of the checkpoint that includes the transaction
+    /// that emitted this event. Populated when the event is delivered on its
+    /// own (for example via `LedgerService.ListEvents`); left unset when the
+    /// event is carried inside its transaction's `events` list, where the
+    /// enclosing `ExecutedTransaction` already provides this context.
+    #[prost(uint64, optional, tag = "7")]
+    pub checkpoint: ::core::option::Option<u64>,
+    /// The digest of the transaction that emitted this event.
+    #[prost(string, optional, tag = "8")]
+    pub transaction_digest: ::core::option::Option<::prost::alloc::string::String>,
+    /// Zero-based position of the emitting transaction within its containing
+    /// checkpoint. For clients verifying authenticated event streams this
+    /// index is part of the BCS-encoded `EventCommitment` leaf used to
+    /// construct the per-checkpoint merkle root.
+    #[prost(uint64, optional, tag = "9")]
+    pub transaction_index: ::core::option::Option<u64>,
+    /// Zero-based index of this event within its transaction's event list.
+    #[prost(uint32, optional, tag = "10")]
+    pub event_index: ::core::option::Option<u32>,
 }
 #[non_exhaustive]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -813,6 +898,10 @@ pub struct ExecutedTransaction {
     /// outputs from this Transaction.
     #[prost(message, optional, tag = "9")]
     pub objects: ::core::option::Option<ObjectSet>,
+    /// Zero-based position of this transaction within the checkpoint that
+    /// includes it.
+    #[prost(uint64, optional, tag = "10")]
+    pub transaction_index: ::core::option::Option<u64>,
 }
 /// The status of an executed transaction.
 #[non_exhaustive]
@@ -1310,6 +1399,10 @@ pub mod command_argument_error {
         /// argument is a mutable reference and it conflicts with another argument to the call, or the
         /// argument is mutable and another reference extends it and will be used in a later command.
         InvalidReferenceArgument = 19,
+        /// Invalid usage of TxContext in the function signature. TxContext can only be used by
+        /// reference, `&TxContext` or `&mut TxContext`. If used mutably, it must be the only
+        /// TxContext parameter, and TxContext can never be returned from a Move call.
+        InvalidTxContext = 20,
     }
     impl CommandArgumentErrorKind {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -1346,6 +1439,7 @@ pub mod command_argument_error {
                     "CANNOT_WRITE_TO_EXTENDED_REFERENCE"
                 }
                 Self::InvalidReferenceArgument => "INVALID_REFERENCE_ARGUMENT",
+                Self::InvalidTxContext => "INVALID_TX_CONTEXT",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1381,6 +1475,7 @@ pub mod command_argument_error {
                     Some(Self::CannotWriteToExtendedReference)
                 }
                 "INVALID_REFERENCE_ARGUMENT" => Some(Self::InvalidReferenceArgument),
+                "INVALID_TX_CONTEXT" => Some(Self::InvalidTxContext),
                 _ => None,
             }
         }
@@ -1529,6 +1624,210 @@ pub mod type_argument_error {
         }
     }
 }
+/// DNF filter for transactions: any term may match, and each term is an AND
+/// of signed literals.
+/// An absent filter matches everything. A present filter must have at least one
+/// term.
+#[derive(Eq, Hash)]
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransactionFilter {
+    /// Terms are ORed together.
+    #[prost(message, repeated, tag = "1")]
+    pub terms: ::prost::alloc::vec::Vec<TransactionTerm>,
+}
+/// One conjunction in a transaction DNF filter.
+#[derive(Eq, Hash)]
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransactionTerm {
+    /// Literals are ANDed together.
+    #[prost(message, repeated, tag = "1")]
+    pub literals: ::prost::alloc::vec::Vec<TransactionLiteral>,
+}
+/// One signed transaction predicate literal: a predicate, optionally negated.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct TransactionLiteral {
+    /// When true, the literal matches transactions that the predicate does *not*
+    /// match.
+    #[prost(bool, tag = "1")]
+    pub negated: bool,
+    /// The transaction-index predicate to match.
+    #[prost(oneof = "transaction_literal::Predicate", tags = "2, 3, 4, 5, 6, 7, 8, 9")]
+    pub predicate: ::core::option::Option<transaction_literal::Predicate>,
+}
+/// Nested message and enum types in `TransactionLiteral`.
+pub mod transaction_literal {
+    /// The transaction-index predicate to match.
+    #[non_exhaustive]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+    pub enum Predicate {
+        /// Match transactions sent by the specified address.
+        #[prost(message, tag = "2")]
+        Sender(super::SenderFilter),
+        /// Match transactions where the specified address's state moved as a side
+        /// effect: it owns an object after the txn, owned an object before the
+        /// txn that was mutated/transferred away/deleted/wrapped, or its
+        /// address-balance changed via an accumulator event.
+        #[prost(message, tag = "3")]
+        AffectedAddress(super::AffectedAddressFilter),
+        /// Match transactions whose effects include a change for the specified
+        /// object.
+        #[prost(message, tag = "4")]
+        AffectedObject(super::AffectedObjectFilter),
+        /// Match transactions that made a Move call matching the specified filter.
+        #[prost(message, tag = "5")]
+        MoveCall(super::MoveCallFilter),
+        /// Match transactions that emitted an event whose package/module fields
+        /// match the specified filter.
+        #[prost(message, tag = "6")]
+        EmitModule(super::EmitModuleFilter),
+        /// Match transactions that emitted an event with a type matching the
+        /// specified filter.
+        #[prost(message, tag = "7")]
+        EventType(super::EventTypeFilter),
+        /// Match transactions that wrote to the specified authenticated event
+        /// stream head.
+        #[prost(message, tag = "8")]
+        EventStreamHead(super::EventStreamHeadFilter),
+        /// Match transactions that wrote a Move package — a first publish or an
+        /// upgrade, of any package.
+        #[prost(message, tag = "9")]
+        PackageWrite(super::PackageWriteFilter),
+    }
+}
+/// DNF filter for events: any term may match, and each term is an AND of
+/// signed literals. Sender predicates match all events from matching
+/// transactions; emit-module, event-type, and event-stream-head predicates match
+/// individual event-space dimensions. An absent filter matches everything. A
+/// present filter must have at least one term.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EventFilter {
+    /// Terms are ORed together.
+    #[prost(message, repeated, tag = "1")]
+    pub terms: ::prost::alloc::vec::Vec<EventTerm>,
+}
+/// One conjunction in an event DNF filter.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EventTerm {
+    /// Literals are ANDed together.
+    #[prost(message, repeated, tag = "1")]
+    pub literals: ::prost::alloc::vec::Vec<EventLiteral>,
+}
+/// One signed event predicate literal: a predicate, optionally negated.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct EventLiteral {
+    /// When true, the literal matches events that the predicate does *not* match.
+    #[prost(bool, tag = "1")]
+    pub negated: bool,
+    /// The event-index predicate to match.
+    #[prost(oneof = "event_literal::Predicate", tags = "2, 3, 4, 5")]
+    pub predicate: ::core::option::Option<event_literal::Predicate>,
+}
+/// Nested message and enum types in `EventLiteral`.
+pub mod event_literal {
+    /// The event-index predicate to match.
+    #[non_exhaustive]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
+    pub enum Predicate {
+        /// Match events from transactions sent by the specified address.
+        #[prost(message, tag = "2")]
+        Sender(super::SenderFilter),
+        /// Match events whose package/module fields match the specified filter.
+        #[prost(message, tag = "3")]
+        EmitModule(super::EmitModuleFilter),
+        /// Match events whose type matches the specified filter.
+        #[prost(message, tag = "4")]
+        EventType(super::EventTypeFilter),
+        /// Match events committed to the specified authenticated event stream head.
+        #[prost(message, tag = "5")]
+        EventStreamHead(super::EventStreamHeadFilter),
+    }
+}
+/// Match by transaction sender address.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SenderFilter {
+    /// The sender address (hex-encoded).
+    #[prost(string, optional, tag = "1")]
+    pub address: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by any address whose state moved as a side effect of the
+/// transaction: object ownership changes (in either direction), prior
+/// owners of removed/wrapped objects, and address-balance changes via
+/// accumulator events.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct AffectedAddressFilter {
+    /// The affected address (hex-encoded).
+    #[prost(string, optional, tag = "1")]
+    pub address: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by changed object ID.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct AffectedObjectFilter {
+    /// The changed object ID (hex-encoded).
+    #[prost(string, optional, tag = "1")]
+    pub object_id: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by Move function call, specified as a `::`-delimited Move path.
+///
+/// Specificity levels:
+/// "0xpkg"                        -> matches any call in the package
+/// "0xpkg::module"                -> matches any call in the module
+/// "0xpkg::module::function"      -> matches calls to the exact function
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct MoveCallFilter {
+    /// Required. Move path of the form `package\[::module[::function]\]`.
+    #[prost(string, optional, tag = "1")]
+    pub function: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by an event's package/module fields, specified as a `::`-delimited
+/// Move path. These identify the top-level Move call that triggered the event.
+///
+/// Specificity levels:
+/// "0xpkg"               -> matches events with this package_id
+/// "0xpkg::module"       -> matches events with this package_id and module
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct EmitModuleFilter {
+    /// Required. Move path of the form `package\[::module\]`.
+    #[prost(string, optional, tag = "1")]
+    pub module: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by event struct type, specified as a Move type string.
+///
+/// Specificity levels:
+/// "0xaddr"                              -> matches events whose type is defined at this address
+/// "0xaddr::module"                      -> matches events whose type is in this module
+/// "0xaddr::module::Name"                -> matches events with this type name (any instantiation)
+/// "0xaddr::module::Name\<T1, T2>"        -> matches events with this exact generic instantiation
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct EventTypeFilter {
+    /// Required. Move type string of the form
+    /// `address\[::module[::Name[<type_params>]\]]`.
+    #[prost(string, optional, tag = "1")]
+    pub event_type: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match by authenticated event stream head.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct EventStreamHeadFilter {
+    /// The stream id address (hex-encoded).
+    #[prost(string, optional, tag = "1")]
+    pub stream_id: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// Match transactions that wrote a Move package.
+#[non_exhaustive]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct PackageWriteFilter {}
 /// Summary of gas charges.
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
@@ -1703,6 +2002,13 @@ pub struct FundsWithdrawal {
     pub coin_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(enumeration = "funds_withdrawal::Source", optional, tag = "3")]
     pub source: ::core::option::Option<i32>,
+    /// The address whose balance is debited if `source` is `SENDER_ALLOWANCE`.
+    #[prost(string, optional, tag = "4")]
+    pub funder: ::core::option::Option<::prost::alloc::string::String>,
+    /// `ObjectId` of the allowance object authorizing the withdrawal if `source`
+    /// is `SENDER_ALLOWANCE`.
+    #[prost(string, optional, tag = "5")]
+    pub allowance: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `FundsWithdrawal`.
 pub mod funds_withdrawal {
@@ -1723,6 +2029,9 @@ pub mod funds_withdrawal {
         Unknown = 0,
         Sender = 1,
         Sponsor = 2,
+        /// Withdraw from `funder`'s balance under the `allowance` object, granted
+        /// to the sender of the transaction.
+        SenderAllowance = 3,
     }
     impl Source {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -1734,6 +2043,7 @@ pub mod funds_withdrawal {
                 Self::Unknown => "SOURCE_UNKNOWN",
                 Self::Sender => "SENDER",
                 Self::Sponsor => "SPONSOR",
+                Self::SenderAllowance => "SENDER_ALLOWANCE",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1742,6 +2052,7 @@ pub mod funds_withdrawal {
                 "SOURCE_UNKNOWN" => Some(Self::Unknown),
                 "SENDER" => Some(Self::Sender),
                 "SPONSOR" => Some(Self::Sponsor),
+                "SENDER_ALLOWANCE" => Some(Self::SenderAllowance),
                 _ => None,
             }
         }
@@ -1969,6 +2280,169 @@ pub struct GetEpochRequest {
 pub struct GetEpochResponse {
     #[prost(message, optional, tag = "1")]
     pub epoch: ::core::option::Option<Epoch>,
+}
+/// Request message for LedgerService.ListCheckpoints.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListCheckpointsRequest {
+    /// Optional. Mask for specifying which parts of the Checkpoint should be
+    /// returned (e.g. summary, contents, signatures).
+    #[prost(message, optional, tag = "1")]
+    pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. Start of the checkpoint range to query (inclusive). Defaults to
+    /// genesis.
+    #[prost(uint64, optional, tag = "2")]
+    pub start_checkpoint: ::core::option::Option<u64>,
+    /// Optional. End of the checkpoint range to query (exclusive). Defaults to the
+    /// current indexed ledger tip.
+    #[prost(uint64, optional, tag = "3")]
+    pub end_checkpoint: ::core::option::Option<u64>,
+    /// Optional. DNF filter over indexed transaction dimensions. A checkpoint
+    /// matches if any transaction it contains satisfies the filter. If absent,
+    /// all checkpoints in the range are returned.
+    #[prost(message, optional, tag = "4")]
+    pub filter: ::core::option::Option<TransactionFilter>,
+    /// Optional cursor-bounded query options. If unspecified, reads in ascending
+    /// order with the default item limit. The server enforces a maximum item
+    /// limit and silently coerces larger values down to it. To paginate, pass
+    /// the last received `Watermark.cursor` as `options.after` (ascending) or
+    /// `options.before` (descending) on the next request.
+    #[prost(message, optional, tag = "5")]
+    pub options: ::core::option::Option<QueryOptions>,
+}
+/// Response message for LedgerService.ListCheckpoints.
+///
+/// Every frame carries a `watermark` with a safe resume cursor. A frame
+/// with `checkpoint` set delivers one matching item; a frame without it reports
+/// scan progress or terminal completion. Watermarks never regress in the
+/// requested ordering but may repeat.
+///
+/// `end` is set exactly once, on the final frame of a successful stream. For
+/// `QUERY_END_REASON_ITEM_LIMIT`, that frame also carries the final item. For
+/// every other end reason, the final frame has no `checkpoint` payload.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListCheckpointsResponse {
+    /// One matching checkpoint.
+    #[prost(message, optional, tag = "1")]
+    pub checkpoint: ::core::option::Option<Checkpoint>,
+    /// Progress watermark as of this frame. Present on every frame. A
+    /// ScanLimit terminal watermark may repeat the previous frame's cursor when
+    /// its authoritative scan frontier was already emitted.
+    #[prost(message, optional, tag = "2")]
+    pub watermark: ::core::option::Option<Watermark>,
+    /// Set exactly once, on the final frame of a successful query stream.
+    #[prost(message, optional, tag = "3")]
+    pub end: ::core::option::Option<QueryEnd>,
+}
+/// Request message for LedgerService.ListTransactions.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListTransactionsRequest {
+    /// Optional. Mask for specifying which parts of the ExecutedTransaction
+    /// should be returned.
+    #[prost(message, optional, tag = "1")]
+    pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. Start of the checkpoint range to query (inclusive). Defaults to
+    /// genesis.
+    #[prost(uint64, optional, tag = "2")]
+    pub start_checkpoint: ::core::option::Option<u64>,
+    /// Optional. End of the checkpoint range to query (exclusive). Defaults to the
+    /// current indexed ledger tip.
+    #[prost(uint64, optional, tag = "3")]
+    pub end_checkpoint: ::core::option::Option<u64>,
+    /// Optional. DNF filter over indexed dimensions.
+    /// If absent, all transactions in the range are returned.
+    #[prost(message, optional, tag = "4")]
+    pub filter: ::core::option::Option<TransactionFilter>,
+    /// Optional cursor-bounded query options. If unspecified, reads in ascending
+    /// order with the default item limit. The server enforces a maximum item
+    /// limit and silently coerces larger values down to it. To paginate, pass
+    /// the last received `Watermark.cursor` as `options.after` (ascending) or
+    /// `options.before` (descending) on the next request.
+    #[prost(message, optional, tag = "5")]
+    pub options: ::core::option::Option<QueryOptions>,
+}
+/// Response message for LedgerService.ListTransactions.
+///
+/// Every frame carries a `watermark` with a safe resume cursor. A frame
+/// with `transaction` set delivers one matching item; a frame without it reports
+/// scan progress or terminal completion. Watermarks never regress in the
+/// requested ordering but may repeat.
+///
+/// `end` is set exactly once, on the final frame of a successful stream. For
+/// `QUERY_END_REASON_ITEM_LIMIT`, that frame also carries the final item. For
+/// every other end reason, the final frame has no `transaction` payload.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListTransactionsResponse {
+    /// One matching transaction. Its position within the containing checkpoint
+    /// is reported by `ExecutedTransaction.transaction_index`.
+    #[prost(message, optional, tag = "1")]
+    pub transaction: ::core::option::Option<ExecutedTransaction>,
+    /// Progress watermark as of this frame. Present on every frame. A
+    /// ScanLimit terminal watermark may repeat the previous frame's cursor when
+    /// its authoritative scan frontier was already emitted.
+    #[prost(message, optional, tag = "2")]
+    pub watermark: ::core::option::Option<Watermark>,
+    /// Set exactly once, on the final frame of a successful query stream.
+    #[prost(message, optional, tag = "3")]
+    pub end: ::core::option::Option<QueryEnd>,
+}
+/// Request message for LedgerService.ListEvents.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListEventsRequest {
+    /// Optional. Mask for specifying which parts of the Event should be returned.
+    #[prost(message, optional, tag = "1")]
+    pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. Start of the checkpoint range to query (inclusive). Defaults to
+    /// genesis.
+    #[prost(uint64, optional, tag = "2")]
+    pub start_checkpoint: ::core::option::Option<u64>,
+    /// Optional. End of the checkpoint range to query (exclusive). Defaults to the
+    /// current indexed ledger tip.
+    #[prost(uint64, optional, tag = "3")]
+    pub end_checkpoint: ::core::option::Option<u64>,
+    /// Optional. DNF filter over indexed dimensions.
+    /// If absent, all events in the range are returned.
+    #[prost(message, optional, tag = "4")]
+    pub filter: ::core::option::Option<EventFilter>,
+    /// Optional cursor-bounded query options. If unspecified, reads in ascending
+    /// order with the default item limit. The server enforces a maximum item
+    /// limit and silently coerces larger values down to it. To paginate, pass
+    /// the last received `Watermark.cursor` as `options.after` (ascending) or
+    /// `options.before` (descending) on the next request.
+    #[prost(message, optional, tag = "5")]
+    pub options: ::core::option::Option<QueryOptions>,
+}
+/// Response message for LedgerService.ListEvents.
+///
+/// Every frame carries a `watermark` with a safe resume cursor. A frame
+/// with `event` set delivers one matching item; a frame without it reports scan
+/// progress or terminal completion. Watermarks never regress in the requested
+/// ordering but may repeat.
+///
+/// `end` is set exactly once, on the final frame of a successful stream. For
+/// `QUERY_END_REASON_ITEM_LIMIT`, that frame also carries the final item. For
+/// every other end reason, the final frame has no `event` payload.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListEventsResponse {
+    /// One matching event. Its ledger position -- containing checkpoint,
+    /// emitting transaction digest and offset, and index within that
+    /// transaction's event list -- is reported by the corresponding fields on
+    /// `Event`.
+    #[prost(message, optional, tag = "1")]
+    pub event: ::core::option::Option<Event>,
+    /// Progress watermark as of this frame. Present on every frame. A
+    /// ScanLimit terminal watermark may repeat the previous frame's cursor when
+    /// its authoritative scan frontier was already emitted.
+    #[prost(message, optional, tag = "2")]
+    pub watermark: ::core::option::Option<Watermark>,
+    /// Set exactly once, on the final frame of a successful query stream.
+    #[prost(message, optional, tag = "3")]
+    pub end: ::core::option::Option<QueryEnd>,
 }
 /// Generated client implementations.
 pub mod ledger_service_client {
@@ -2232,6 +2706,91 @@ pub mod ledger_service_client {
                 .insert(GrpcMethod::new("rtd.rpc.v2.LedgerService", "GetEpoch"));
             self.inner.unary(req, path, codec).await
         }
+        /// List checkpoints matching the provided filters.
+        ///
+        /// Checkpoints are returned in ascending or descending checkpoint sequence
+        /// number order according to the query options ordering.
+        /// A checkpoint matches if any transaction it contains satisfies the filter.
+        pub async fn list_checkpoints(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ListCheckpointsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::ListCheckpointsResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rtd.rpc.v2.LedgerService/ListCheckpoints",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rtd.rpc.v2.LedgerService", "ListCheckpoints"));
+            self.inner.server_streaming(req, path, codec).await
+        }
+        /// List transactions matching the provided filters.
+        ///
+        /// Transactions are returned in ascending or descending transaction sequence
+        /// order according to the query options ordering.
+        pub async fn list_transactions(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ListTransactionsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::ListTransactionsResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rtd.rpc.v2.LedgerService/ListTransactions",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rtd.rpc.v2.LedgerService", "ListTransactions"));
+            self.inner.server_streaming(req, path, codec).await
+        }
+        /// List events matching the provided filters.
+        ///
+        /// Events are returned in ascending or descending packed event sequence order
+        /// according to the query options ordering.
+        pub async fn list_events(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ListEventsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::ListEventsResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rtd.rpc.v2.LedgerService/ListEvents",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rtd.rpc.v2.LedgerService", "ListEvents"));
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -2254,49 +2813,103 @@ pub mod ledger_service_server {
         ) -> std::result::Result<
             tonic::Response<super::GetServiceInfoResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_object(
             &self,
             request: tonic::Request<super::GetObjectRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetObjectResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn batch_get_objects(
             &self,
             request: tonic::Request<super::BatchGetObjectsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::BatchGetObjectsResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_transaction(
             &self,
             request: tonic::Request<super::GetTransactionRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetTransactionResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn batch_get_transactions(
             &self,
             request: tonic::Request<super::BatchGetTransactionsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::BatchGetTransactionsResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_checkpoint(
             &self,
             request: tonic::Request<super::GetCheckpointRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetCheckpointResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_epoch(
             &self,
             request: tonic::Request<super::GetEpochRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetEpochResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
+        /// List checkpoints matching the provided filters.
+        ///
+        /// Checkpoints are returned in ascending or descending checkpoint sequence
+        /// number order according to the query options ordering.
+        /// A checkpoint matches if any transaction it contains satisfies the filter.
+        async fn list_checkpoints(
+            &self,
+            request: tonic::Request<super::ListCheckpointsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<BoxStream<super::ListCheckpointsResponse>>,
+            tonic::Status,
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
+        /// List transactions matching the provided filters.
+        ///
+        /// Transactions are returned in ascending or descending transaction sequence
+        /// order according to the query options ordering.
+        async fn list_transactions(
+            &self,
+            request: tonic::Request<super::ListTransactionsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<BoxStream<super::ListTransactionsResponse>>,
+            tonic::Status,
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
+        /// List events matching the provided filters.
+        ///
+        /// Events are returned in ascending or descending packed event sequence order
+        /// according to the query options ordering.
+        async fn list_events(
+            &self,
+            request: tonic::Request<super::ListEventsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<BoxStream<super::ListEventsResponse>>,
+            tonic::Status,
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct LedgerServiceServer<T> {
@@ -2691,6 +3304,148 @@ pub mod ledger_service_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/rtd.rpc.v2.LedgerService/ListCheckpoints" => {
+                    #[allow(non_camel_case_types)]
+                    struct ListCheckpointsSvc<T: LedgerService>(pub Arc<T>);
+                    impl<
+                        T: LedgerService,
+                    > tonic::server::ServerStreamingService<
+                        super::ListCheckpointsRequest,
+                    > for ListCheckpointsSvc<T> {
+                        type Response = super::ListCheckpointsResponse;
+                        type ResponseStream = BoxStream<super::ListCheckpointsResponse>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ListCheckpointsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as LedgerService>::list_checkpoints(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ListCheckpointsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/rtd.rpc.v2.LedgerService/ListTransactions" => {
+                    #[allow(non_camel_case_types)]
+                    struct ListTransactionsSvc<T: LedgerService>(pub Arc<T>);
+                    impl<
+                        T: LedgerService,
+                    > tonic::server::ServerStreamingService<
+                        super::ListTransactionsRequest,
+                    > for ListTransactionsSvc<T> {
+                        type Response = super::ListTransactionsResponse;
+                        type ResponseStream = BoxStream<super::ListTransactionsResponse>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ListTransactionsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as LedgerService>::list_transactions(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ListTransactionsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/rtd.rpc.v2.LedgerService/ListEvents" => {
+                    #[allow(non_camel_case_types)]
+                    struct ListEventsSvc<T: LedgerService>(pub Arc<T>);
+                    impl<
+                        T: LedgerService,
+                    > tonic::server::ServerStreamingService<super::ListEventsRequest>
+                    for ListEventsSvc<T> {
+                        type Response = super::ListEventsResponse;
+                        type ResponseStream = BoxStream<super::ListEventsResponse>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ListEventsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as LedgerService>::list_events(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ListEventsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
@@ -3186,9 +3941,51 @@ impl Ability {
 #[non_exhaustive]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct GetPackageRequest {
-    /// Required. The `storage_id` of the requested package.
+    /// Required. The `storage_id` of any version of the requested package.
+    ///
+    /// When no `selector` is set, the package stored at exactly this id is
+    /// returned. When a `selector` is set, `package_id` only identifies the
+    /// package's upgrade lineage (via its original id), and the selected
+    /// version within that lineage is returned.
     #[prost(string, optional, tag = "1")]
     pub package_id: ::core::option::Option<::prost::alloc::string::String>,
+    /// Optional. Return the package in `package_id`'s upgrade lineage that
+    /// matches one of the following:
+    ///
+    /// * `version`: the package with exactly this version.
+    /// * `at_checkpoint`: the latest package that existed at or before this
+    ///   checkpoint. The checkpoint must be at or below the highest checkpoint
+    ///   the server has indexed; larger values fail with `NOT_FOUND` instead of
+    ///   resolving to the latest known version, so a successful response is
+    ///   exact as of `at_checkpoint`. Servers that prune history may also fail
+    ///   with `NOT_FOUND` for checkpoints below their lowest available one.
+    ///
+    /// If neither is set, the package stored at `package_id` is returned.
+    #[prost(oneof = "get_package_request::Selector", tags = "2, 3")]
+    pub selector: ::core::option::Option<get_package_request::Selector>,
+}
+/// Nested message and enum types in `GetPackageRequest`.
+pub mod get_package_request {
+    /// Optional. Return the package in `package_id`'s upgrade lineage that
+    /// matches one of the following:
+    ///
+    /// * `version`: the package with exactly this version.
+    /// * `at_checkpoint`: the latest package that existed at or before this
+    ///   checkpoint. The checkpoint must be at or below the highest checkpoint
+    ///   the server has indexed; larger values fail with `NOT_FOUND` instead of
+    ///   resolving to the latest known version, so a successful response is
+    ///   exact as of `at_checkpoint`. Servers that prune history may also fail
+    ///   with `NOT_FOUND` for checkpoints below their lowest available one.
+    ///
+    /// If neither is set, the package stored at `package_id` is returned.
+    #[non_exhaustive]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Oneof)]
+    pub enum Selector {
+        #[prost(uint64, tag = "2")]
+        Version(u64),
+        #[prost(uint64, tag = "3")]
+        AtCheckpoint(u64),
+    }
 }
 #[non_exhaustive]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3491,28 +4288,36 @@ pub mod move_package_service_server {
         ) -> std::result::Result<
             tonic::Response<super::GetPackageResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_datatype(
             &self,
             request: tonic::Request<super::GetDatatypeRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetDatatypeResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_function(
             &self,
             request: tonic::Request<super::GetFunctionRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetFunctionResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn list_package_versions(
             &self,
             request: tonic::Request<super::ListPackageVersionsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ListPackageVersionsResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct MovePackageServiceServer<T> {
@@ -4044,14 +4849,18 @@ pub mod name_service_server {
         ) -> std::result::Result<
             tonic::Response<super::LookupNameResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn reverse_lookup_name(
             &self,
             request: tonic::Request<super::ReverseLookupNameRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ReverseLookupNameResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct NameServiceServer<T> {
@@ -4312,6 +5121,10 @@ pub struct Object {
     /// Current balance if this object is a `0x2::coin::Coin<T>`
     #[prost(uint64, optional, tag = "101")]
     pub balance: ::core::option::Option<u64>,
+    /// JSON rendering of the object based on an on-chain template.
+    /// This will not be set if the value's type does not have an associated `Display` template.
+    #[prost(message, optional, boxed, tag = "102")]
+    pub display: ::core::option::Option<::prost::alloc::boxed::Box<Display>>,
 }
 /// Set of Objects
 #[non_exhaustive]
@@ -4320,6 +5133,21 @@ pub struct ObjectSet {
     /// Objects are sorted by the key `(object_id, version)`.
     #[prost(message, repeated, tag = "1")]
     pub objects: ::prost::alloc::vec::Vec<Object>,
+}
+/// A rendered JSON blob based on an on-chain template.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Display {
+    /// Output for all successfully substituted display fields. Unsuccessful
+    /// fields will be `null`, and will be accompanied by a field in `errors`,
+    /// explaining the error.
+    #[prost(message, optional, tag = "1")]
+    pub output: ::core::option::Option<::prost_types::Value>,
+    /// If any fields failed to render, this will contain a mapping from failed
+    /// field names to error messages. If all fields succeed, this will either be
+    /// `null` or not set.
+    #[prost(message, optional, tag = "2")]
+    pub errors: ::core::option::Option<::prost_types::Value>,
 }
 /// Reference to an object.
 #[non_exhaustive]
@@ -4405,16 +5233,194 @@ pub mod owner {
 pub struct ProtocolConfig {
     #[prost(uint64, optional, tag = "1")]
     pub protocol_version: ::core::option::Option<u64>,
+    /// Deprecated in favor of the lossless `configs` field.
     #[prost(btree_map = "string, bool", tag = "2")]
     pub feature_flags: ::prost::alloc::collections::BTreeMap<
         ::prost::alloc::string::String,
         bool,
     >,
+    /// Deprecated in favor of the lossless `configs` field.
     #[prost(btree_map = "string, string", tag = "3")]
     pub attributes: ::prost::alloc::collections::BTreeMap<
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
+    #[prost(btree_map = "string, message", tag = "4")]
+    pub configs: ::prost::alloc::collections::BTreeMap<
+        ::prost::alloc::string::String,
+        ::prost_types::Value,
+    >,
+}
+/// Cursor-bounded query options.
+///
+/// `after` and `before` are canonical ledger-position bounds, not
+/// ordering-relative cursors. `after` always excludes items at or below that
+/// cursor, and `before` always excludes items at or above that cursor. Ordering
+/// only controls the order of returned items within the resulting open interval.
+///
+/// When a request also specifies a checkpoint range, cursor bounds and
+/// checkpoint bounds compose by intersection: results come only from ledger
+/// positions inside both. Checkpoint bounds are likewise canonical and
+/// ordering-independent.
+///
+/// For example, with `after = A`, `before = B`, `ordering = DESCENDING`, and
+/// `limit = N`, the response contains up to N matching items in descending
+/// order from the interval `(A, B)`. If the response ends with
+/// `QUERY_END_REASON_ITEM_LIMIT`, resume by keeping `after = A` and setting
+/// `before` to the last `Watermark.cursor` received. That cursor is the
+/// lowest position reached in ledger order, so it becomes the next exclusive
+/// upper bound.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct QueryOptions {
+    /// The maximum number of items to return. Each method applies its own default
+    /// and maximum. QueryEnd does not count against this limit.
+    #[prost(uint32, optional, tag = "1")]
+    pub limit: ::core::option::Option<u32>,
+    /// Opaque exclusive lower bound. Results must be strictly after this cursor in
+    /// canonical ledger order.
+    #[prost(bytes = "bytes", optional, tag = "2")]
+    pub after: ::core::option::Option<::prost::bytes::Bytes>,
+    /// Opaque exclusive upper bound. Results must be strictly before this cursor
+    /// in canonical ledger order.
+    #[prost(bytes = "bytes", optional, tag = "3")]
+    pub before: ::core::option::Option<::prost::bytes::Bytes>,
+    /// Ordering for returned results. Defaults to ASCENDING.
+    ///
+    /// Ordering only controls the order of results within the bounded interval;
+    /// cursor bounds keep the same meaning for ascending and descending reads.
+    #[prost(enumeration = "Ordering", optional, tag = "4")]
+    pub ordering: ::core::option::Option<i32>,
+}
+/// Progress marker for a query scan. Carried on every response frame, whether or
+/// not the frame delivers a matching item. Watermarks never regress in the
+/// requested ordering, but consecutive frames may carry the same watermark when
+/// additional work does not advance the safe resume frontier.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Watermark {
+    /// Opaque cursor at this scan position. Set on every watermark. Use as
+    /// `options.after` (ascending) or `options.before` (descending) on the next
+    /// request to resume from here. The most recently received cursor is always
+    /// the safe resume point.
+    #[prost(bytes = "bytes", optional, tag = "1")]
+    pub cursor: ::core::option::Option<::prost::bytes::Bytes>,
+    /// The inclusive boundary checkpoint that the scan has fully covered within
+    /// the request's effective interval, in the request's ordering direction: an
+    /// ascending scan has emitted every matching item in the interval at
+    /// checkpoints `<= checkpoint` (strictly greater ones may still hold
+    /// matches); a descending scan has emitted every matching item in the
+    /// interval at checkpoints `>= checkpoint`. This boundary never regresses in
+    /// the scan direction, but it may repeat while the cursor advances.
+    ///
+    /// Unset until the scan's first checkpoint is fully covered. For example, a
+    /// scan resumed from a cursor that lands mid-checkpoint leaves this unset
+    /// until the next checkpoint boundary in the scan direction is fully covered.
+    /// A watermark still has a valid resume cursor while this field is unset.
+    #[prost(uint64, optional, tag = "2")]
+    pub checkpoint: ::core::option::Option<u64>,
+}
+/// Marker for the final frame of a successful query stream. Every successful
+/// stream sets `QueryEnd` on exactly one frame, after which no further frames
+/// are sent. That frame always carries the final watermark. For `ItemLimit`, it
+/// also carries the final matching item; for every other reason it carries no
+/// item. A ScanLimit terminal watermark may repeat the previous frame's cursor
+/// when its authoritative scan frontier was already emitted; this does not
+/// repeat an item.
+///
+/// A stream that fails or is cancelled terminates with a gRPC status and does
+/// not send `QueryEnd`.
+#[non_exhaustive]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct QueryEnd {
+    /// Reason this response stopped.
+    #[prost(enumeration = "QueryEndReason", optional, tag = "1")]
+    pub reason: ::core::option::Option<i32>,
+}
+/// Ordering for the returned result set.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum Ordering {
+    /// Return results in increasing cursor order.
+    Ascending = 0,
+    /// Return results in decreasing cursor order.
+    Descending = 1,
+}
+impl Ordering {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Ascending => "ORDERING_ASCENDING",
+            Self::Descending => "ORDERING_DESCENDING",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "ORDERING_ASCENDING" => Some(Self::Ascending),
+            "ORDERING_DESCENDING" => Some(Self::Descending),
+            _ => None,
+        }
+    }
+}
+/// Reason the server stopped this query response.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum QueryEndReason {
+    /// The stop reason was not specified.
+    Unknown = 0,
+    /// The response reached the requested item limit. The final matching item's
+    /// frame carries `QueryEnd` and the final watermark. Resume from that frame's
+    /// `Watermark.cursor` to continue reading the same effective interval.
+    ItemLimit = 1,
+    /// The response reached the server's per-request bucket-fetch budget for
+    /// filtered scans before reaching the effective interval bound. The terminal
+    /// frame carries no item. Its watermark cursor is the authoritative scan
+    /// frontier from which to resume.
+    ScanLimit = 2,
+    /// The scan reached a requested checkpoint range bound. The terminal frame
+    /// carries no item.
+    CheckpointBound = 3,
+    /// The scan reached an exclusive cursor bound. The terminal frame carries no
+    /// item. Its watermark cursor represents that resolved bound without claiming
+    /// that its containing checkpoint was fully covered.
+    CursorBound = 4,
+    /// The scan reached the currently indexed ledger tip. The terminal frame
+    /// carries no item.
+    LedgerTip = 5,
+}
+impl QueryEndReason {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unknown => "QUERY_END_REASON_UNKNOWN",
+            Self::ItemLimit => "QUERY_END_REASON_ITEM_LIMIT",
+            Self::ScanLimit => "QUERY_END_REASON_SCAN_LIMIT",
+            Self::CheckpointBound => "QUERY_END_REASON_CHECKPOINT_BOUND",
+            Self::CursorBound => "QUERY_END_REASON_CURSOR_BOUND",
+            Self::LedgerTip => "QUERY_END_REASON_LEDGER_TIP",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "QUERY_END_REASON_UNKNOWN" => Some(Self::Unknown),
+            "QUERY_END_REASON_ITEM_LIMIT" => Some(Self::ItemLimit),
+            "QUERY_END_REASON_SCAN_LIMIT" => Some(Self::ScanLimit),
+            "QUERY_END_REASON_CHECKPOINT_BOUND" => Some(Self::CheckpointBound),
+            "QUERY_END_REASON_CURSOR_BOUND" => Some(Self::CursorBound),
+            "QUERY_END_REASON_LEDGER_TIP" => Some(Self::LedgerTip),
+            _ => None,
+        }
+    }
 }
 /// A signature from a user.
 #[non_exhaustive]
@@ -4644,7 +5650,7 @@ pub struct CircomG2 {
 /// A passkey authenticator.
 ///
 /// See
-/// [struct.PasskeyAuthenticator](<https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/struct.PasskeyAuthenticator.html#bcs>)
+/// [struct.PasskeyAuthenticator](<https://linkuverse.github.io/rtd-rust-sdk/rtd_sdk_types/struct.PasskeyAuthenticator.html#bcs>)
 /// for more information on the requirements on the shape of the
 /// `client_data_json` field.
 #[non_exhaustive]
@@ -4710,7 +5716,7 @@ pub struct ValidatorAggregatedSignature {
 ///
 /// Note: the enum values defined by this proto message exactly match their
 /// expected BCS serialized values when serialized as a u8. See
-/// [enum.SignatureScheme](<https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/enum.SignatureScheme.html>)
+/// [enum.SignatureScheme](<https://linkuverse.github.io/rtd-rust-sdk/rtd_sdk_types/enum.SignatureScheme.html>)
 /// for more information about signature schemes.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -4934,7 +5940,9 @@ pub mod signature_verification_service_server {
         ) -> std::result::Result<
             tonic::Response<super::VerifySignatureResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct SignatureVerificationServiceServer<T> {
@@ -5420,9 +6428,17 @@ pub struct Balance {
     /// The type of the coin (e.g., 0x2::rtd::RTD).
     #[prost(string, optional, tag = "1")]
     pub coin_type: ::core::option::Option<::prost::alloc::string::String>,
-    /// Shows the total balance of the coin in its smallest unit.
+    /// The total balance of `coin_type` in its smallest unit.
+    /// This is the sum of all spendable amounts of `coin_type` (`address_balance`
+    /// and `coin_balance`).
     #[prost(uint64, optional, tag = "3")]
     pub balance: ::core::option::Option<u64>,
+    /// The balance of `Balance<T>` in this address's Address Balance.
+    #[prost(uint64, optional, tag = "4")]
+    pub address_balance: ::core::option::Option<u64>,
+    /// The balance of all `Coin<T>` objects owned by this address.
+    #[prost(uint64, optional, tag = "5")]
+    pub coin_balance: ::core::option::Option<u64>,
 }
 /// Request message for `NodeService.ListDynamicFields`
 #[non_exhaustive]
@@ -5817,35 +6833,45 @@ pub mod state_service_server {
         ) -> std::result::Result<
             tonic::Response<super::ListDynamicFieldsResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn list_owned_objects(
             &self,
             request: tonic::Request<super::ListOwnedObjectsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ListOwnedObjectsResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_coin_info(
             &self,
             request: tonic::Request<super::GetCoinInfoRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetCoinInfoResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn get_balance(
             &self,
             request: tonic::Request<super::GetBalanceRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetBalanceResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn list_balances(
             &self,
             request: tonic::Request<super::ListBalancesRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ListBalancesResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct StateServiceServer<T> {
@@ -6190,26 +7216,100 @@ pub mod state_service_server {
         const NAME: &'static str = SERVICE_NAME;
     }
 }
-/// Request message for SubscriptionService.SubscribeCheckpoints
+/// Request message for SubscriptionService.SubscribeCheckpoints.
+#[derive(Eq, Hash)]
 #[non_exhaustive]
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SubscribeCheckpointsRequest {
-    /// Optional. Mask for specifying which parts of the
-    /// SubscribeCheckpointsResponse should be returned.
+    /// Optional. Mask for specifying which parts of the Checkpoint should be
+    /// returned (e.g. summary, contents, signatures). `cursor` is always
+    /// populated and is not subject to the mask.
     #[prost(message, optional, tag = "1")]
     pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. DNF filter over indexed transaction dimensions. A checkpoint
+    /// matches if any transaction it contains satisfies the filter. If absent,
+    /// every checkpoint is streamed.
+    #[prost(message, optional, tag = "2")]
+    pub filter: ::core::option::Option<TransactionFilter>,
 }
-/// Response message for SubscriptionService.SubscribeCheckpoints
+/// Response message for SubscriptionService.SubscribeCheckpoints.
+///
+/// A checkpoint stream's position is checkpoint-granular, so the `cursor`
+/// sequence number stands in for the `Watermark` message the other
+/// subscription responses carry. Progress-only frames (with `checkpoint`
+/// unset) occur only on filtered streams: on an unfiltered stream every frame
+/// carries both fields, in order and without gaps.
 #[non_exhaustive]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SubscribeCheckpointsResponse {
-    /// Required. The checkpoint sequence number and value of the current cursor
-    /// into the checkpoint stream
+    /// Required. The checkpoint sequence number the stream has fully covered,
+    /// inclusive: every matching checkpoint from the stream's start position
+    /// through `cursor` has been delivered. Present on every frame and
+    /// advances monotonically.
     #[prost(uint64, optional, tag = "1")]
     pub cursor: ::core::option::Option<u64>,
-    /// The requested data for this checkpoint
+    /// The matching checkpoint. Unset when this frame only advances the
+    /// cursor past non-matching checkpoints.
     #[prost(message, optional, tag = "2")]
     pub checkpoint: ::core::option::Option<Checkpoint>,
+}
+/// Request message for SubscriptionService.SubscribeTransactions.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SubscribeTransactionsRequest {
+    /// Optional. Mask for specifying which parts of the ExecutedTransaction
+    /// should be returned.
+    #[prost(message, optional, tag = "1")]
+    pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. DNF filter over indexed dimensions. If absent, every
+    /// transaction is streamed.
+    #[prost(message, optional, tag = "2")]
+    pub filter: ::core::option::Option<TransactionFilter>,
+}
+/// Response message for SubscriptionService.SubscribeTransactions.
+///
+/// Mirrors ListTransactionsResponse, except there is no `end` field: a
+/// subscription stream has no successful end.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SubscribeTransactionsResponse {
+    /// One matching transaction. Its position within the containing checkpoint
+    /// is reported by `ExecutedTransaction.transaction_index`.
+    #[prost(message, optional, tag = "1")]
+    pub transaction: ::core::option::Option<ExecutedTransaction>,
+    /// Progress watermark as of this frame. Present on every frame.
+    #[prost(message, optional, tag = "2")]
+    pub watermark: ::core::option::Option<Watermark>,
+}
+/// Request message for SubscriptionService.SubscribeEvents.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SubscribeEventsRequest {
+    /// Optional. Mask for specifying which parts of the Event should be
+    /// returned.
+    #[prost(message, optional, tag = "1")]
+    pub read_mask: ::core::option::Option<::prost_types::FieldMask>,
+    /// Optional. DNF filter over indexed dimensions. If absent, every event is
+    /// streamed.
+    #[prost(message, optional, tag = "2")]
+    pub filter: ::core::option::Option<EventFilter>,
+}
+/// Response message for SubscriptionService.SubscribeEvents.
+///
+/// Mirrors ListEventsResponse, except there is no `end` field: a subscription
+/// stream has no successful end.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SubscribeEventsResponse {
+    /// One matching event. Its ledger position -- containing checkpoint,
+    /// emitting transaction digest and offset, and index within that
+    /// transaction's event list -- is reported by the corresponding fields on
+    /// `Event`.
+    #[prost(message, optional, tag = "1")]
+    pub event: ::core::option::Option<Event>,
+    /// Progress watermark as of this frame. Present on every frame.
+    #[prost(message, optional, tag = "2")]
+    pub watermark: ::core::option::Option<Watermark>,
 }
 /// Generated client implementations.
 pub mod subscription_service_client {
@@ -6222,6 +7322,33 @@ pub mod subscription_service_client {
     )]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    /// SubscriptionService provides filtered, real-time streams of checkpoints,
+    /// transactions, and events.
+    ///
+    /// Each Subscribe API pairs with the LedgerService List API of the same name:
+    /// requests take the same filter message, and responses carry the same item
+    /// and watermark shapes with identical cursor semantics.
+    ///
+    /// Subscriptions do not support resumption. A new subscription always begins
+    /// at the current tip of the chain as seen by the server (the latest executed
+    /// checkpoint). To recover data missed between subscriptions, replay the gap
+    /// with the paired List API: pass the last received `Watermark.cursor` as
+    /// `options.after` on the List request (for checkpoints, pass the last
+    /// received `cursor + 1` as `start_checkpoint`). The List scan reads from the
+    /// indexed tip, which may trail the subscription's start position; repeat the
+    /// List call as the index advances until the replay reaches the position
+    /// established by the subscription's first frame.
+    ///
+    /// A subscription behaves like an unbounded ascending scan: every frame
+    /// carries the subscriber's resume point, and progress advances as
+    /// checkpoints are fully covered. Two delivery guarantees keep sparse
+    /// filters live: the first frame on a filtered subscription is a
+    /// progress-only frame establishing the stream's start position, and
+    /// progress continues to advance with bounded staleness even when no item
+    /// matches.
+    ///
+    /// Subscription streams have no successful end: they run until cancelled by
+    /// the client or terminated by the server with a gRPC status.
     #[derive(Debug, Clone)]
     pub struct SubscriptionServiceClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -6304,15 +7431,10 @@ pub mod subscription_service_client {
         }
         /// Subscribe to the stream of checkpoints.
         ///
-        /// This API provides a subscription to the checkpoint stream for the Rtd
-        /// blockchain. When a subscription is initialized the stream will begin with
-        /// the latest executed checkpoint as seen by the server. Responses are
-        /// guaranteed to return checkpoints in-order and without gaps. This enables
-        /// clients to know exactly the last checkpoint they have processed and in the
-        /// event the subscription terminates (either by the client/server or by the
-        /// connection breaking), clients will be able to reinitialize a subscription
-        /// and then leverage other APIs in order to request data for the checkpoints
-        /// they missed.
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields checkpoints matching the filter as they are executed.
+        /// A checkpoint matches if any transaction it contains satisfies the
+        /// filter.
         pub async fn subscribe_checkpoints(
             &mut self,
             request: impl tonic::IntoRequest<super::SubscribeCheckpointsRequest>,
@@ -6344,6 +7466,71 @@ pub mod subscription_service_client {
                 );
             self.inner.server_streaming(req, path, codec).await
         }
+        /// Subscribe to the stream of transactions.
+        ///
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields transactions matching the filter as they are executed.
+        pub async fn subscribe_transactions(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SubscribeTransactionsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<
+                tonic::codec::Streaming<super::SubscribeTransactionsResponse>,
+            >,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rtd.rpc.v2.SubscriptionService/SubscribeTransactions",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "rtd.rpc.v2.SubscriptionService",
+                        "SubscribeTransactions",
+                    ),
+                );
+            self.inner.server_streaming(req, path, codec).await
+        }
+        /// Subscribe to the stream of events.
+        ///
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields events matching the filter as they are emitted.
+        pub async fn subscribe_events(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SubscribeEventsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::SubscribeEventsResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rtd.rpc.v2.SubscriptionService/SubscribeEvents",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("rtd.rpc.v2.SubscriptionService", "SubscribeEvents"),
+                );
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -6359,34 +7546,75 @@ pub mod subscription_service_server {
     /// Generated trait containing gRPC methods that should be implemented for use with SubscriptionServiceServer.
     #[async_trait]
     pub trait SubscriptionService: std::marker::Send + std::marker::Sync + 'static {
-        /// Server streaming response type for the SubscribeCheckpoints method.
-        type SubscribeCheckpointsStream: tonic::codegen::tokio_stream::Stream<
-                Item = std::result::Result<
-                    super::SubscribeCheckpointsResponse,
-                    tonic::Status,
-                >,
-            >
-            + std::marker::Send
-            + 'static;
         /// Subscribe to the stream of checkpoints.
         ///
-        /// This API provides a subscription to the checkpoint stream for the Rtd
-        /// blockchain. When a subscription is initialized the stream will begin with
-        /// the latest executed checkpoint as seen by the server. Responses are
-        /// guaranteed to return checkpoints in-order and without gaps. This enables
-        /// clients to know exactly the last checkpoint they have processed and in the
-        /// event the subscription terminates (either by the client/server or by the
-        /// connection breaking), clients will be able to reinitialize a subscription
-        /// and then leverage other APIs in order to request data for the checkpoints
-        /// they missed.
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields checkpoints matching the filter as they are executed.
+        /// A checkpoint matches if any transaction it contains satisfies the
+        /// filter.
         async fn subscribe_checkpoints(
             &self,
             request: tonic::Request<super::SubscribeCheckpointsRequest>,
         ) -> std::result::Result<
-            tonic::Response<Self::SubscribeCheckpointsStream>,
+            tonic::Response<BoxStream<super::SubscribeCheckpointsResponse>>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
+        /// Subscribe to the stream of transactions.
+        ///
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields transactions matching the filter as they are executed.
+        async fn subscribe_transactions(
+            &self,
+            request: tonic::Request<super::SubscribeTransactionsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<BoxStream<super::SubscribeTransactionsResponse>>,
+            tonic::Status,
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
+        /// Subscribe to the stream of events.
+        ///
+        /// The stream begins at the latest executed checkpoint as seen by the
+        /// server and yields events matching the filter as they are emitted.
+        async fn subscribe_events(
+            &self,
+            request: tonic::Request<super::SubscribeEventsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<BoxStream<super::SubscribeEventsResponse>>,
+            tonic::Status,
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
+    /// SubscriptionService provides filtered, real-time streams of checkpoints,
+    /// transactions, and events.
+    ///
+    /// Each Subscribe API pairs with the LedgerService List API of the same name:
+    /// requests take the same filter message, and responses carry the same item
+    /// and watermark shapes with identical cursor semantics.
+    ///
+    /// Subscriptions do not support resumption. A new subscription always begins
+    /// at the current tip of the chain as seen by the server (the latest executed
+    /// checkpoint). To recover data missed between subscriptions, replay the gap
+    /// with the paired List API: pass the last received `Watermark.cursor` as
+    /// `options.after` on the List request (for checkpoints, pass the last
+    /// received `cursor + 1` as `start_checkpoint`). The List scan reads from the
+    /// indexed tip, which may trail the subscription's start position; repeat the
+    /// List call as the index advances until the replay reaches the position
+    /// established by the subscription's first frame.
+    ///
+    /// A subscription behaves like an unbounded ascending scan: every frame
+    /// carries the subscriber's resume point, and progress advances as
+    /// checkpoints are fully covered. Two delivery guarantees keep sparse
+    /// filters live: the first frame on a filtered subscription is a
+    /// progress-only frame establishing the stream's start position, and
+    /// progress continues to advance with bounded staleness even when no item
+    /// matches.
+    ///
+    /// Subscription streams have no successful end: they run until cancelled by
+    /// the client or terminated by the server with a gRPC status.
     #[derive(Debug)]
     pub struct SubscriptionServiceServer<T> {
         inner: Arc<T>,
@@ -6472,7 +7700,9 @@ pub mod subscription_service_server {
                         super::SubscribeCheckpointsRequest,
                     > for SubscribeCheckpointsSvc<T> {
                         type Response = super::SubscribeCheckpointsResponse;
-                        type ResponseStream = T::SubscribeCheckpointsStream;
+                        type ResponseStream = BoxStream<
+                            super::SubscribeCheckpointsResponse,
+                        >;
                         type Future = BoxFuture<
                             tonic::Response<Self::ResponseStream>,
                             tonic::Status,
@@ -6499,6 +7729,110 @@ pub mod subscription_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = SubscribeCheckpointsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/rtd.rpc.v2.SubscriptionService/SubscribeTransactions" => {
+                    #[allow(non_camel_case_types)]
+                    struct SubscribeTransactionsSvc<T: SubscriptionService>(pub Arc<T>);
+                    impl<
+                        T: SubscriptionService,
+                    > tonic::server::ServerStreamingService<
+                        super::SubscribeTransactionsRequest,
+                    > for SubscribeTransactionsSvc<T> {
+                        type Response = super::SubscribeTransactionsResponse;
+                        type ResponseStream = BoxStream<
+                            super::SubscribeTransactionsResponse,
+                        >;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SubscribeTransactionsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as SubscriptionService>::subscribe_transactions(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = SubscribeTransactionsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/rtd.rpc.v2.SubscriptionService/SubscribeEvents" => {
+                    #[allow(non_camel_case_types)]
+                    struct SubscribeEventsSvc<T: SubscriptionService>(pub Arc<T>);
+                    impl<
+                        T: SubscriptionService,
+                    > tonic::server::ServerStreamingService<
+                        super::SubscribeEventsRequest,
+                    > for SubscribeEventsSvc<T> {
+                        type Response = super::SubscribeEventsResponse;
+                        type ResponseStream = BoxStream<super::SubscribeEventsResponse>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SubscribeEventsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as SubscriptionService>::subscribe_events(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = SubscribeEventsSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -6989,6 +8323,10 @@ pub struct TransactionExpiration {
     /// User-provided uniqueness identifier to differentiate otherwise identical transactions
     #[prost(uint32, optional, tag = "7")]
     pub nonce: ::core::option::Option<u32>,
+    /// The validators allowed to propose this transaction in consensus. Only set when `kind`
+    /// is `VALIDITY`. Leave unset to let any validator propose the transaction.
+    #[prost(message, optional, tag = "8")]
+    pub allowed_proposers: ::core::option::Option<AllowedProposers>,
 }
 /// Nested message and enum types in `TransactionExpiration`.
 pub mod transaction_expiration {
@@ -7022,6 +8360,9 @@ pub mod transaction_expiration {
         /// executed digests for the maximum possible expiry range to differentiate
         /// retries from unique transactions with otherwise identical inputs.
         ValidDuring = 3,
+        /// Everything in VALID_DURING, plus a restriction on which validators may
+        /// propose the transaction in consensus.
+        Validity = 4,
     }
     impl TransactionExpirationKind {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -7034,6 +8375,7 @@ pub mod transaction_expiration {
                 Self::None => "NONE",
                 Self::Epoch => "EPOCH",
                 Self::ValidDuring => "VALID_DURING",
+                Self::Validity => "VALIDITY",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -7043,10 +8385,30 @@ pub mod transaction_expiration {
                 "NONE" => Some(Self::None),
                 "EPOCH" => Some(Self::Epoch),
                 "VALID_DURING" => Some(Self::ValidDuring),
+                "VALIDITY" => Some(Self::Validity),
                 _ => None,
             }
         }
     }
+}
+/// The validators allowed to propose a transaction in consensus.
+///
+/// Proposal by any other validator is byzantine behavior and invalidates the whole block.
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct AllowedProposers {
+    /// The epoch whose committee `proposers` indexes into.
+    ///
+    /// Committee indices are only meaningful against one committee, so a set recorded for any
+    /// other epoch is ignored and the transaction is treated as naming no proposers.
+    #[prost(uint64, optional, tag = "1")]
+    pub epoch: ::core::option::Option<u64>,
+    /// Committee indices of the allowed proposers, strictly increasing and non-empty.
+    ///
+    /// An empty list names no validator and is rejected; omit `allowed_proposers` entirely to
+    /// let any validator propose the transaction.
+    #[prost(uint32, repeated, tag = "2")]
+    pub proposers: ::prost::alloc::vec::Vec<u32>,
 }
 /// Transaction type.
 #[non_exhaustive]
@@ -7101,6 +8463,8 @@ pub mod transaction_kind {
         ConsensusCommitPrologueV3 = 9,
         /// V4 consensus commit update.
         ConsensusCommitPrologueV4 = 10,
+        /// A system transaction comprised of a list of native commands and Move calls.
+        ProgrammableSystemTransaction = 11,
     }
     impl Kind {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -7120,6 +8484,7 @@ pub mod transaction_kind {
                 Self::ConsensusCommitPrologueV2 => "CONSENSUS_COMMIT_PROLOGUE_V2",
                 Self::ConsensusCommitPrologueV3 => "CONSENSUS_COMMIT_PROLOGUE_V3",
                 Self::ConsensusCommitPrologueV4 => "CONSENSUS_COMMIT_PROLOGUE_V4",
+                Self::ProgrammableSystemTransaction => "PROGRAMMABLE_SYSTEM_TRANSACTION",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -7136,6 +8501,9 @@ pub mod transaction_kind {
                 "CONSENSUS_COMMIT_PROLOGUE_V2" => Some(Self::ConsensusCommitPrologueV2),
                 "CONSENSUS_COMMIT_PROLOGUE_V3" => Some(Self::ConsensusCommitPrologueV3),
                 "CONSENSUS_COMMIT_PROLOGUE_V4" => Some(Self::ConsensusCommitPrologueV4),
+                "PROGRAMMABLE_SYSTEM_TRANSACTION" => {
+                    Some(Self::ProgrammableSystemTransaction)
+                }
                 _ => None,
             }
         }
@@ -7537,7 +8905,7 @@ pub struct EndOfEpochTransaction {
 pub struct EndOfEpochTransactionKind {
     #[prost(enumeration = "end_of_epoch_transaction_kind::Kind", optional, tag = "1")]
     pub kind: ::core::option::Option<i32>,
-    #[prost(oneof = "end_of_epoch_transaction_kind::Data", tags = "2, 3, 4, 5, 6")]
+    #[prost(oneof = "end_of_epoch_transaction_kind::Data", tags = "2, 3, 4, 5, 6, 7")]
     pub data: ::core::option::Option<end_of_epoch_transaction_kind::Data>,
 }
 /// Nested message and enum types in `EndOfEpochTransactionKind`.
@@ -7581,6 +8949,10 @@ pub mod end_of_epoch_transaction_kind {
         DisplayRegistryCreate = 11,
         /// Create and initialize the Address Alias State object.
         AddressAliasStateCreate = 12,
+        /// Write the end-of-epoch-computed storage cost for accumulator objects.
+        WriteAccumulatorStorageCost = 13,
+        /// Create and initialize the Forwarding Address Registry object.
+        ForwardingAddressRegistryCreate = 14,
     }
     impl Kind {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -7604,6 +8976,10 @@ pub mod end_of_epoch_transaction_kind {
                 Self::CoinRegistryCreate => "COIN_REGISTRY_CREATE",
                 Self::DisplayRegistryCreate => "DISPLAY_REGISTRY_CREATE",
                 Self::AddressAliasStateCreate => "ADDRESS_ALIAS_STATE_CREATE",
+                Self::WriteAccumulatorStorageCost => "WRITE_ACCUMULATOR_STORAGE_COST",
+                Self::ForwardingAddressRegistryCreate => {
+                    "FORWARDING_ADDRESS_REGISTRY_CREATE"
+                }
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -7624,6 +9000,12 @@ pub mod end_of_epoch_transaction_kind {
                 "COIN_REGISTRY_CREATE" => Some(Self::CoinRegistryCreate),
                 "DISPLAY_REGISTRY_CREATE" => Some(Self::DisplayRegistryCreate),
                 "ADDRESS_ALIAS_STATE_CREATE" => Some(Self::AddressAliasStateCreate),
+                "WRITE_ACCUMULATOR_STORAGE_COST" => {
+                    Some(Self::WriteAccumulatorStorageCost)
+                }
+                "FORWARDING_ADDRESS_REGISTRY_CREATE" => {
+                    Some(Self::ForwardingAddressRegistryCreate)
+                }
                 _ => None,
             }
         }
@@ -7646,6 +9028,9 @@ pub mod end_of_epoch_transaction_kind {
         /// Start version of the Bridge object
         #[prost(uint64, tag = "6")]
         BridgeObjectVersion(u64),
+        /// Contains the end-of-epoch-computed storage cost for accumulator objects.
+        #[prost(uint64, tag = "7")]
+        StorageCost(u64),
     }
 }
 /// Expire old JWKs.
@@ -7844,6 +9229,11 @@ pub struct SimulateTransactionResponse {
     pub transaction: ::core::option::Option<ExecutedTransaction>,
     #[prost(message, repeated, tag = "2")]
     pub command_outputs: ::prost::alloc::vec::Vec<CommandResult>,
+    /// A suggested gas price to use, that is above RGP, in order to provide a
+    /// better chance of the transaction being included in the presence of
+    /// congested objects.
+    #[prost(uint64, optional, tag = "3")]
+    pub suggested_gas_price: ::core::option::Option<u64>,
 }
 /// An intermediate result/output from the execution of a single command
 #[non_exhaustive]
@@ -8037,14 +9427,18 @@ pub mod transaction_execution_service_server {
         ) -> std::result::Result<
             tonic::Response<super::ExecuteTransactionResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
         async fn simulate_transaction(
             &self,
             request: tonic::Request<super::SimulateTransactionRequest>,
         ) -> std::result::Result<
             tonic::Response<super::SimulateTransactionResponse>,
             tonic::Status,
-        >;
+        > {
+            Err(tonic::Status::unimplemented("Not yet implemented"))
+        }
     }
     #[derive(Debug)]
     pub struct TransactionExecutionServiceServer<T> {

@@ -107,6 +107,60 @@ impl Ed25519PrivateKey {
     pub(crate) fn from_dalek(private_key: ed25519_dalek::SigningKey) -> Self {
         Self(private_key)
     }
+
+    /// Build a key from the scheme flag and key bytes of a decoded
+    /// `flag || private_key` payload.
+    fn from_flagged_key_bytes(
+        scheme: SignatureScheme,
+        key: Vec<u8>,
+    ) -> Result<Self, SignatureError> {
+        if scheme != SignatureScheme::Ed25519 {
+            return Err(SignatureError::from_source(format!(
+                "private key scheme flag is `{}`, expected `ed25519`",
+                scheme.name(),
+            )));
+        }
+        let bytes: [u8; Self::LENGTH] = key.try_into().map_err(|_: Vec<u8>| {
+            SignatureError::from_source("private key has invalid length for ed25519")
+        })?;
+        Ok(Self::new(bytes))
+    }
+
+    #[cfg(feature = "bech32")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+    /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
+    ///
+    /// Returns an error if the string does not have the `rtdprivkey` HRP, has
+    /// an invalid Bech32 (BIP-173) checksum, has a flag byte that is not
+    /// Ed25519, or has the wrong number of key bytes.
+    pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode(s)?;
+        Self::from_flagged_key_bytes(scheme, key)
+    }
+
+    #[cfg(feature = "bech32")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+    /// Encode this private key as a Bech32 `rtdprivkey` string.
+    pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
+        crate::rtdpriv::encode(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
+    }
+
+    /// Decode a Base64 `flag || private_key` string, the legacy keystore
+    /// format used for entries of the Rtd CLI's `rtd.keystore` file.
+    ///
+    /// Returns an error if the string is not valid Base64, has a flag byte
+    /// that is not Ed25519, or has the wrong number of key bytes.
+    pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
+        Self::from_flagged_key_bytes(scheme, key)
+    }
+
+    /// Encode this private key as a Base64 `flag || private_key` string, the
+    /// legacy keystore format used for entries of the Rtd CLI's
+    /// `rtd.keystore` file.
+    pub fn to_base64(&self) -> String {
+        crate::rtdpriv::encode_base64(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
+    }
 }
 
 impl Signer<Ed25519Signature> for Ed25519PrivateKey {

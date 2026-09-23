@@ -108,6 +108,22 @@ impl MultisigMember {
 /// Rtd blockchain. The number of required signautres to authorize the execution of a transaction
 /// is determined by `(signature_0_weight + signature_1_weight ..) >= threshold`.
 ///
+/// # Validity
+///
+/// Deserialization (BCS, JSON, or `from_serialized_bytes` on a containing
+/// `MultisigAggregatedSignature`) does **not** enforce structural validity:
+/// the resulting committee may have zero members, zero threshold, threshold
+/// greater than the sum of weights, duplicate members, or more than the
+/// `MAX_COMMITTEE_SIZE` limit. Validity is checked downstream by the
+/// verifier in `rtd-crypto` before any signature is verified.
+///
+/// Consumers who inspect a deserialized committee — counting members,
+/// summing weights, indexing by bitmap, etc. — without first running
+/// signature verification **must** call [`MultisigCommittee::is_valid`]
+/// and reject the committee if it returns `false`. Skipping this check
+/// can cause downstream code to operate on attacker-supplied,
+/// well-formed-looking but malformed committees.
+///
 /// # BCS
 ///
 /// The BCS serialized form for this type is defined by the following ABNF:
@@ -286,8 +302,17 @@ impl MultisigAggregatedSignature {
 
 impl PartialEq for MultisigAggregatedSignature {
     fn eq(&self, other: &Self) -> bool {
-        // Skip comparing the legacy bitmap since we always convert to the new bitmap form
+        // Compare every field, including `legacy_bitmap`. Although the
+        // legacy bitmap is logically redundant with `bitmap` (they encode
+        // the same information in different formats), `to_bytes` prefers
+        // the legacy form whenever it is `Some`, so two signatures that
+        // differ only by `legacy_bitmap` will serialize to different byte
+        // strings. Excluding `legacy_bitmap` from `==` would let downstream
+        // consumers observe values where `a == b` but
+        // `bcs::to_bytes(a) != bcs::to_bytes(b)`, breaking standard
+        // Eq/Serialize expectations.
         self.bitmap == other.bitmap
+            && self.legacy_bitmap == other.legacy_bitmap
             && self.signatures == other.signatures
             && self.committee == other.committee
     }
@@ -567,6 +592,54 @@ mod serialization {
         {
             if deserializer.is_human_readable() {
                 let readable = ReadableMultisigAggregatedSignature::deserialize(deserializer)?;
+                // Mirror the BCS legacy branch's invariant: when
+                // `legacy_bitmap` is present, `bitmap` is derived from it
+                // (`from_serialized_bytes` always rebuilds it via
+                // `roaring_bitmap_to_u16`). Rejecting any other
+                // combination prevents a JSON payload from carrying two
+                // independent signer sets — one observed by `bitmap()`
+                // and another emitted by `to_bytes()` — which would let
+                // an attacker exhibit different attributable signers
+                // through different accessor paths on the same
+                // logical signature.
+                if let Some(legacy_bitmap) = &readable.legacy_bitmap {
+                    let derived =
+                        roaring_bitmap_to_u16(legacy_bitmap).map_err(serde::de::Error::custom)?;
+                    if derived != readable.bitmap {
+                        return Err(serde::de::Error::custom(
+                            "bitmap does not match legacy_bitmap",
+                        ));
+                    }
+                    // The legacy BCS form encodes each member public key
+                    // via `Base64MultisigMemberPublicKey`, which only
+                    // supports Ed25519/Secp256k1/Secp256r1. A
+                    // `legacy_bitmap` attached to a committee with a
+                    // ZkLogin or Passkey member therefore cannot be
+                    // re-serialized: `to_bytes()` would route through
+                    // the legacy branch, hit the explicit `Err` for
+                    // those variants, and panic via the inner
+                    // `.expect("serialization cannot fail")`. Reject the
+                    // combination at deserialization so an untrusted
+                    // JSON payload cannot crash a worker thread on its
+                    // first `to_bytes()`.
+                    for member in &readable.committee.members {
+                        match member.public_key {
+                            MultisigMemberPublicKey::ZkLogin(_) => {
+                                return Err(serde::de::Error::custom(
+                                    "zklogin member is not representable in legacy multisig",
+                                ));
+                            }
+                            MultisigMemberPublicKey::Passkey(_) => {
+                                return Err(serde::de::Error::custom(
+                                    "passkey member is not representable in legacy multisig",
+                                ));
+                            }
+                            MultisigMemberPublicKey::Ed25519(_)
+                            | MultisigMemberPublicKey::Secp256k1(_)
+                            | MultisigMemberPublicKey::Secp256r1(_) => {}
+                        }
+                    }
+                }
                 Ok(Self {
                     signatures: readable.signatures,
                     bitmap: readable.bitmap,
@@ -855,5 +928,113 @@ mod serialization {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
+
+    // Regression test: `legacy_bitmap` used to be excluded from
+    // `PartialEq`, so two signatures whose `to_bytes` output differed
+    // (because the legacy form is preferred when present) could compare
+    // equal. Equality must now imply byte equality.
+    #[test]
+    fn partial_eq_includes_legacy_bitmap() {
+        let committee = MultisigCommittee::new(Vec::new(), 0);
+        let a = MultisigAggregatedSignature::new(committee.clone(), Vec::new(), 0);
+        let mut b = MultisigAggregatedSignature::new(committee, Vec::new(), 0);
+        assert_eq!(a, b);
+
+        b.with_legacy_bitmap(crate::Bitmap::new());
+        assert_ne!(a, b);
+    }
+
+    // Regression test: the JSON deserializer used to copy `bitmap` and
+    // `legacy_bitmap` straight onto the value without checking that
+    // they encoded the same signer set, letting a single payload carry
+    // one signer set observed by `bitmap()` and a different one emitted
+    // by `to_bytes()` (which prefers the legacy form when present). The
+    // BCS legacy branch always derives `bitmap` from `legacy_bitmap`, so
+    // the JSON path must reject inputs where those two fields disagree.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn json_dual_bitmap_must_be_consistent() {
+        let mut roaring = crate::Bitmap::new();
+        roaring.insert(5);
+        let legacy_b64 = {
+            use base64ct::Encoding;
+            let mut buf = Vec::new();
+            roaring.serialize_into(&mut buf).unwrap();
+            base64ct::Base64::encode_string(&buf)
+        };
+
+        // `bitmap` claims signer 0, `legacy_bitmap` claims signer 5.
+        let inconsistent = format!(
+            r#"{{"signatures":[],"bitmap":1,"legacy_bitmap":"{legacy_b64}",
+                "committee":{{"members":[],"threshold":0}}}}"#
+        );
+        let err = serde_json::from_str::<MultisigAggregatedSignature>(&inconsistent)
+            .expect_err("inconsistent dual bitmap must be rejected");
+        assert!(
+            err.to_string().contains("legacy_bitmap"),
+            "unexpected error: {err}"
+        );
+
+        // The canonical form (bitmap derived from legacy_bitmap) is
+        // accepted.
+        let consistent = format!(
+            r#"{{"signatures":[],"bitmap":{},"legacy_bitmap":"{legacy_b64}",
+                "committee":{{"members":[],"threshold":0}}}}"#,
+            1u16 << 5,
+        );
+        serde_json::from_str::<MultisigAggregatedSignature>(&consistent)
+            .expect("consistent dual bitmap must be accepted");
+    }
+
+    // Regression test: `to_bytes()` used to panic via
+    // `.expect("serialization cannot fail")` when `legacy_bitmap` was
+    // present alongside a ZkLogin or Passkey committee member, because
+    // the legacy member encoding (`Base64MultisigMemberPublicKey`)
+    // explicitly returns `Err` for those variants. The JSON
+    // deserializer must reject the combination so an attacker cannot
+    // craft a payload that crashes a consumer on its first `to_bytes()`.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn json_legacy_bitmap_with_zklogin_member_is_rejected() {
+        let legacy_b64 = {
+            use base64ct::Encoding;
+            let mut buf = Vec::new();
+            crate::Bitmap::new().serialize_into(&mut buf).unwrap();
+            base64ct::Base64::encode_string(&buf)
+        };
+
+        let payload = format!(
+            r#"{{
+                "signatures":[],
+                "bitmap":0,
+                "legacy_bitmap":"{legacy_b64}",
+                "committee":{{
+                    "members":[{{
+                        "public_key":{{
+                            "scheme":"zklogin",
+                            "iss":"https://accounts.google.com",
+                            "address_seed":"7"
+                        }},
+                        "weight":1
+                    }}],
+                    "threshold":1
+                }}
+            }}"#
+        );
+        let err = serde_json::from_str::<MultisigAggregatedSignature>(&payload)
+            .expect_err("zklogin member with legacy bitmap must be rejected");
+        assert!(
+            err.to_string().contains("zklogin"),
+            "unexpected error: {err}"
+        );
     }
 }

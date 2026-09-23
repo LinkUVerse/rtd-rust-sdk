@@ -90,7 +90,10 @@ impl std::str::FromStr for TypeTag {
     type Err = TypeParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse::parse_type_tag(s).map_err(|_| TypeParseError { source: s.into() })
+        parse::parse_type_tag(s).map_err(|e| TypeParseError {
+            source: s.into(),
+            message: e,
+        })
     }
 }
 
@@ -103,11 +106,16 @@ impl From<StructTag> for TypeTag {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeParseError {
     source: String,
+    message: Option<String>,
 }
 
 impl std::fmt::Display for TypeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
+        if let Some(message) = &self.message {
+            write!(f, "unable to parse type \"{}\": {message}", self.source)
+        } else {
+            write!(f, "unable to parse type \"{}\"", self.source)
+        }
     }
 }
 
@@ -145,6 +153,7 @@ impl Identifier {
             .map(|ident| Self(ident.into()))
             .map_err(|_| TypeParseError {
                 source: identifier.as_ref().into(),
+                message: None,
             })
     }
 
@@ -186,7 +195,10 @@ impl std::str::FromStr for Identifier {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         parse::parse_identifier(s)
             .map(|ident| Self(ident.into()))
-            .map_err(|_| TypeParseError { source: s.into() })
+            .map_err(|_| TypeParseError {
+                source: s.into(),
+                message: None,
+            })
     }
 }
 
@@ -310,6 +322,86 @@ impl StructTag {
             None
         }
     }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn balance_accumulator_field(coin_type: TypeTag) -> Self {
+        let u128_type = Self {
+            address: Address::TWO,
+            module: Identifier::from_static("accumulator"),
+            name: Identifier::from_static("U128"),
+            type_params: vec![],
+        };
+
+        let balance_type = Self {
+            address: Address::TWO,
+            module: Identifier::from_static("balance"),
+            name: Identifier::from_static("Balance"),
+            type_params: vec![coin_type],
+        };
+
+        let key_type = Self {
+            address: Address::TWO,
+            module: Identifier::from_static("accumulator"),
+            name: Identifier::from_static("Key"),
+            type_params: vec![balance_type.into()],
+        };
+
+        Self {
+            address: Address::TWO,
+            module: Identifier::from_static("dynamic_field"),
+            name: Identifier::from_static("Field"),
+            type_params: vec![key_type.into(), u128_type.into()],
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn is_balance_accumulator_field(&self) -> Option<&TypeTag> {
+        let (key_type, u128_type) = if self.address() == &Address::TWO
+            && self.module() == "dynamic_field"
+            && self.name() == "Field"
+            && let [TypeTag::Struct(key_type), TypeTag::Struct(u128_type)] = self.type_params()
+        {
+            (key_type, u128_type)
+        } else {
+            return None;
+        };
+
+        if !(u128_type.address() == &Address::TWO
+            && u128_type.module() == "accumulator"
+            && u128_type.name() == "U128"
+            && u128_type.type_params().is_empty())
+        {
+            return None;
+        }
+
+        let balance_type = if key_type.address() == &Address::TWO
+            && key_type.module() == "accumulator"
+            && key_type.name() == "Key"
+            && let [TypeTag::Struct(balance_type)] = key_type.type_params()
+        {
+            balance_type
+        } else {
+            return None;
+        };
+
+        if balance_type.address() == &Address::TWO
+            && balance_type.module() == "balance"
+            && balance_type.name() == "Balance"
+            && let [coin_type] = balance_type.type_params()
+        {
+            Some(coin_type)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn is_gas(&self) -> bool {
+        self.address() == &Address::TWO
+            && self.module() == "rtd"
+            && self.name() == "RTD"
+            && self.type_params().is_empty()
+    }
 }
 
 impl std::fmt::Display for StructTag {
@@ -344,6 +436,9 @@ impl std::str::FromStr for StructTag {
     type Err = TypeParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse::parse_struct_tag(s).map_err(|_| TypeParseError { source: s.into() })
+        parse::parse_struct_tag(s).map_err(|e| TypeParseError {
+            source: s.into(),
+            message: e,
+        })
     }
 }

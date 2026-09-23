@@ -18,6 +18,12 @@
 //!   library.
 //! - `hash`: Enables support for hashing, which is required for deriving addresses and calculating
 //!   digests for various types.
+//! - `unstable`: Alpha/experimental APIs. Items behind this feature are not covered by the
+//!   crate's semver guarantees and may change or be removed at any time. Currently this gates
+//!   the proof verification primitives needed to authenticate state against a trusted checkpoint
+//!   summary, including the Blake2b256 Merkle tree implementation in the [`merkle`] module and
+//!   the OCS (Object Checkpoint State) proof verifier types in the [`proof`] module. Implies
+//!   the `hash` and `serde` features.
 //! - `proptest`: Enables support for the [proptest] library by providing implementations of
 //!   [proptest::arbitrary::Arbitrary] for many types.
 //!
@@ -111,7 +117,13 @@ mod gas;
 #[cfg(feature = "hash")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "hash")))]
 pub mod hash;
+#[cfg(feature = "unstable")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "unstable")))]
+pub mod merkle;
 mod object;
+#[cfg(feature = "unstable")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "unstable")))]
+pub mod proof;
 mod transaction;
 mod type_tag;
 mod u256;
@@ -173,10 +185,12 @@ pub use digest::Digest;
 pub use digest::DigestParseError;
 pub use digest::SigningDigest;
 pub use effects::AccumulatorOperation;
+pub use effects::AccumulatorValue;
 pub use effects::AccumulatorWrite;
 pub use effects::ChangedObject;
 pub use effects::IdOperation;
 pub use effects::ModifiedAtVersion;
+pub use effects::ObjectChange;
 pub use effects::ObjectIn;
 pub use effects::ObjectOut;
 pub use effects::ObjectReferenceWithOwner;
@@ -207,6 +221,7 @@ pub use object::TypeOrigin;
 pub use object::UpgradeInfo;
 pub use object::Version;
 pub use transaction::ActiveJwk;
+pub use transaction::AllowedProposers;
 pub use transaction::Argument;
 pub use transaction::AuthenticatorStateExpire;
 pub use transaction::AuthenticatorStateUpdate;
@@ -250,6 +265,8 @@ pub use type_tag::Identifier;
 pub use type_tag::StructTag;
 pub use type_tag::TypeParseError;
 pub use type_tag::TypeTag;
+pub use u256::U256;
+pub use u256::U256ParseError;
 
 #[cfg(feature = "serde")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "serde")))]

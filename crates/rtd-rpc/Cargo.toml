@@ -1,8 +1,8 @@
 [package]
 name = "rtd-rpc"
-version = "0.1.1"
-authors = ["Brandon Williams <brandon@linkulabs.com>"]
-repository = "https://github.com/linkulabs/rtd-rust-sdk/"
+version = "0.4.0"
+authors = ["Brandon Williams <brandon@linkuverse.com>"]
+repository = "https://github.com/linkuverse/rtd-rust-sdk/"
 license = "Apache-2.0"
 edition = "2024"
 description = "RPC interface definitions and client for the Rtd Sdk"
@@ -23,14 +23,23 @@ rustdoc-args = [
 [features]
 default = []
 faucet = ["dep:reqwest"]
+# Alpha/experimental APIs. Items behind this feature are not covered by
+# the crate's semver guarantees and may change or be removed at any time.
+unstable = ["rtd-sdk-types/unstable", "dep:rtd-crypto"]
 
 [dependencies]
 bcs = "0.1.6"
 serde = { version = "1.0.228" }
-rtd-sdk-types = { version = "0.1.1", path = "../rtd-sdk-types", default-features = false, features = ["serde", "hash"] }
+rtd-sdk-types = { version = "0.4.0", path = "../rtd-sdk-types", default-features = false, features = ["serde", "hash"] }
+rtd-crypto = { version = "0.4.0", path = "../rtd-crypto", default-features = false, features = ["bls12381"], optional = true }
 
 # dependencies for the protobuf and gRPC definitions
 bytes = "1.10"
+# Not used directly; this floors hyper at 1.10, whose h2 requirement
+# excludes the h2 versions with stream-cancellation flow-control
+# accounting bugs (hyperium/h2#893, #896, #897, #898, and #913) that can
+# permanently wedge a multiplexed gRPC connection.
+hyper = { version = "1.10", default-features = false }
 tonic = { version = "0.14.2", default-features = false, features = ["channel", "codegen", "tls-ring", "tls-webpki-roots", "zstd"] }
 tonic-prost = "0.14.2"
 prost = "0.14.1"
@@ -39,8 +48,10 @@ tap = "1"
 base64 = "0.22.1"
 serde_json = "1.0.145"
 http = "1.3.1"
+http-body = "1"
 futures = "0.3"
-tokio = { version = "1.40", features = ["time"] }
+tokio = { version = "1.40", features = ["time", "rt", "sync"] }
+tower = { version = "0.5.3", default-features = false, features = ["util"] }
 
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"], optional = true }
 
@@ -49,8 +60,12 @@ rand = "0.8"
 paste = "1.0.15"
 proptest = { version = "1.8.0", default-features = false, features = ["std"] }
 test-strategy = { version = "0.4" }
-rtd-sdk-types = { version = "0.1.1", path = "../rtd-sdk-types", default-features = false, features = ["proptest", "serde", "hash"] }
+rtd-sdk-types = { version = "0.4.0", path = "../rtd-sdk-types", default-features = false, features = ["proptest", "serde", "hash"] }
 serde_json = { version = "1.0.145" }
+tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "net", "test-util"] }
+# The starvation integration tests host a mock gRPC server built from this
+# crate's own generated server stubs.
+tonic = { version = "0.14.2", default-features = false, features = ["server", "router"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(doc_cfg)'] }

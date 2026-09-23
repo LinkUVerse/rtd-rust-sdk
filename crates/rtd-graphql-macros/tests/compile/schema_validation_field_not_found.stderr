@@ -1,0 +1,5 @@
+error: Field 'nonExistent' not found on type 'Object'. Available fields: address, version
+ --> tests/compile/schema_validation_field_not_found.rs:6:20
+  |
+6 |     #[field(path = "object.nonExistent")]
+  |                    ^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error: Field path cannot be empty
+ --> tests/compile/empty_path.rs:6:20
+  |
+6 |     #[field(path = "")]
+  |                    ^^

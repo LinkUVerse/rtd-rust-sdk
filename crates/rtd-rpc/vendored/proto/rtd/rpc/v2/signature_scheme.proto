@@ -9,7 +9,7 @@ package rtd.rpc.v2;
 //
 // Note: the enum values defined by this proto message exactly match their
 // expected BCS serialized values when serialized as a u8. See
-// [enum.SignatureScheme](https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/enum.SignatureScheme.html)
+// [enum.SignatureScheme](https://linkuverse.github.io/rtd-rust-sdk/rtd_sdk_types/enum.SignatureScheme.html)
 // for more information about signature schemes.
 enum SignatureScheme {
   ED25519 = 0;

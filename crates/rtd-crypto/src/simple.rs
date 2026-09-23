@@ -1,7 +1,7 @@
 use crate::SignatureError;
-use signature::Verifier;
 use rtd_sdk_types::SimpleSignature;
 use rtd_sdk_types::UserSignature;
+use signature::Verifier;
 
 pub struct SimpleVerifier;
 
@@ -75,12 +75,12 @@ pub use keypair::{SimpleKeypair, SimpleVerifiyingKey};
 )]
 mod keypair {
     use crate::SignatureError;
-    use signature::Signer;
-    use signature::Verifier;
     use rtd_sdk_types::MultisigMemberPublicKey;
     use rtd_sdk_types::SignatureScheme;
     use rtd_sdk_types::SimpleSignature;
     use rtd_sdk_types::UserSignature;
+    use signature::Signer;
+    use signature::Verifier;
 
     #[derive(Debug, Clone)]
     pub struct SimpleKeypair {
@@ -220,6 +220,107 @@ mod keypair {
                 InnerKeypair::Secp256r1(private_key) => private_key.to_pem(),
             }
         }
+
+        /// Build a keypair from the scheme flag and key bytes of a decoded
+        /// `flag || private_key` payload.
+        ///
+        /// Only the simple schemes (Ed25519, Secp256k1, Secp256r1) are
+        /// accepted, matching the upstream `rtd-types` parser.
+        fn from_flagged_key_bytes(
+            scheme: SignatureScheme,
+            key: Vec<u8>,
+        ) -> Result<Self, SignatureError> {
+            let inner = match scheme {
+                #[cfg(feature = "ed25519")]
+                SignatureScheme::Ed25519 => {
+                    let bytes: [u8; crate::ed25519::Ed25519PrivateKey::LENGTH] =
+                        key.try_into().map_err(|_: Vec<u8>| {
+                            SignatureError::from_source(
+                                "private key has invalid length for ed25519",
+                            )
+                        })?;
+                    InnerKeypair::Ed25519(crate::ed25519::Ed25519PrivateKey::new(bytes))
+                }
+                #[cfg(feature = "secp256k1")]
+                SignatureScheme::Secp256k1 => {
+                    let bytes: [u8; crate::secp256k1::Secp256k1PrivateKey::LENGTH] =
+                        key.try_into().map_err(|_: Vec<u8>| {
+                            SignatureError::from_source(
+                                "private key has invalid length for secp256k1",
+                            )
+                        })?;
+                    InnerKeypair::Secp256k1(crate::secp256k1::Secp256k1PrivateKey::new(bytes)?)
+                }
+                #[cfg(feature = "secp256r1")]
+                SignatureScheme::Secp256r1 => {
+                    let bytes: [u8; crate::secp256r1::Secp256r1PrivateKey::LENGTH] =
+                        key.try_into().map_err(|_: Vec<u8>| {
+                            SignatureError::from_source(
+                                "private key has invalid length for secp256r1",
+                            )
+                        })?;
+                    InnerKeypair::Secp256r1(crate::secp256r1::Secp256r1PrivateKey::new(bytes))
+                }
+                other => {
+                    return Err(SignatureError::from_source(format!(
+                        "unsupported scheme `{}` in private key encoding",
+                        other.name(),
+                    )));
+                }
+            };
+            Ok(Self { inner })
+        }
+
+        #[cfg(feature = "bech32")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+        /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
+        ///
+        /// The leading flag byte selects the scheme. Only the simple schemes
+        /// (Ed25519, Secp256k1, Secp256r1) are accepted, matching the
+        /// upstream `rtd-types` parser.
+        pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+            let (scheme, key) = crate::rtdpriv::decode(s)?;
+            Self::from_flagged_key_bytes(scheme, key)
+        }
+
+        #[cfg(feature = "bech32")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+        /// Encode this private key as a Bech32 `rtdprivkey` string.
+        pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
+            match &self.inner {
+                #[cfg(feature = "ed25519")]
+                InnerKeypair::Ed25519(private_key) => private_key.to_rtdprivkey(),
+                #[cfg(feature = "secp256k1")]
+                InnerKeypair::Secp256k1(private_key) => private_key.to_rtdprivkey(),
+                #[cfg(feature = "secp256r1")]
+                InnerKeypair::Secp256r1(private_key) => private_key.to_rtdprivkey(),
+            }
+        }
+
+        /// Decode a Base64 `flag || private_key` string, the legacy keystore
+        /// format used for entries of the Rtd CLI's `rtd.keystore` file.
+        ///
+        /// The leading flag byte selects the scheme. Only the simple schemes
+        /// (Ed25519, Secp256k1, Secp256r1) are accepted, matching the
+        /// upstream `rtd-types` parser.
+        pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
+            let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
+            Self::from_flagged_key_bytes(scheme, key)
+        }
+
+        /// Encode this private key as a Base64 `flag || private_key` string,
+        /// the legacy keystore format used for entries of the Rtd CLI's
+        /// `rtd.keystore` file.
+        pub fn to_base64(&self) -> String {
+            match &self.inner {
+                #[cfg(feature = "ed25519")]
+                InnerKeypair::Ed25519(private_key) => private_key.to_base64(),
+                #[cfg(feature = "secp256k1")]
+                InnerKeypair::Secp256k1(private_key) => private_key.to_base64(),
+                #[cfg(feature = "secp256r1")]
+                InnerKeypair::Secp256r1(private_key) => private_key.to_base64(),
+            }
+        }
     }
 
     impl Signer<SimpleSignature> for SimpleKeypair {
@@ -311,6 +412,24 @@ mod keypair {
                 #[cfg(feature = "secp256r1")]
                 InnerVerifyingKey::Secp256r1(verifying_key) => {
                     MultisigMemberPublicKey::Secp256r1(verifying_key.public_key())
+                }
+            }
+        }
+
+        /// Derive the `Address` that corresponds to this public key.
+        pub fn derive_address(&self) -> rtd_sdk_types::Address {
+            match &self.inner {
+                #[cfg(feature = "ed25519")]
+                InnerVerifyingKey::Ed25519(verifying_key) => {
+                    verifying_key.public_key().derive_address()
+                }
+                #[cfg(feature = "secp256k1")]
+                InnerVerifyingKey::Secp256k1(verifying_key) => {
+                    verifying_key.public_key().derive_address()
+                }
+                #[cfg(feature = "secp256r1")]
+                InnerVerifyingKey::Secp256r1(verifying_key) => {
+                    verifying_key.public_key().derive_address()
                 }
             }
         }
@@ -637,5 +756,234 @@ mod test {
         assert_eq!(der, from_der.to_der().unwrap());
         let from_pem = SimpleVerifiyingKey::from_pem(&pem).unwrap();
         assert_eq!(pem, from_pem.to_pem().unwrap());
+    }
+
+    #[proptest]
+    fn simple_verifying_key_derives_matching_address(
+        ed25519: Ed25519PrivateKey,
+        secp256k1: Secp256k1PrivateKey,
+        secp256r1: Secp256r1PrivateKey,
+    ) {
+        // SimpleVerifiyingKey::derive_address must agree with the address
+        // derived from the scheme-specific public key.
+        let expected = ed25519.public_key().derive_address();
+        let keypair = SimpleKeypair::from(ed25519);
+        assert_eq!(keypair.verifying_key().derive_address(), expected);
+
+        let expected = secp256k1.public_key().derive_address();
+        let keypair = SimpleKeypair::from(secp256k1);
+        assert_eq!(keypair.verifying_key().derive_address(), expected);
+
+        let expected = secp256r1.public_key().derive_address();
+        let keypair = SimpleKeypair::from(secp256r1);
+        assert_eq!(keypair.verifying_key().derive_address(), expected);
+    }
+
+    // Round-trip and rejection tests for the rtdprivkey Bech32 format.
+    //
+    // These mirror the format produced by the Rtd CLI and the upstream
+    // `rtd-types` crate. `EXPECTED_ED25519_VECTOR` is taken directly from
+    // `crates/rtd-types/src/unit_tests/crypto_tests.rs` in the main rtd repo
+    // and is included as a regression vector against any future encoding
+    // drift.
+    #[cfg(feature = "bech32")]
+    mod bech32 {
+        use super::*;
+        use rtd_sdk_types::SignatureScheme;
+
+        #[cfg(target_arch = "wasm32")]
+        use wasm_bindgen_test::wasm_bindgen_test as test;
+
+        // Upstream test vector: `Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32]))`
+        // encoded with `RtdKeyPair::encode()` produces this string. The leading
+        // flag byte is 0x00 (Ed25519); the remaining 32 bytes are the private
+        // key.
+        const UPSTREAM_ED25519_RTDPRIVKEY: &str =
+            "rtdprivkey1qzdlfxn2qa2lj5uprl8pyhexs02sg2wrhdy7qaq50cqgnffw4c247cdptmr";
+
+        #[proptest]
+        fn ed25519_round_trip(signer: Ed25519PrivateKey) {
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Ed25519PrivateKey::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            // SimpleKeypair dispatch agrees.
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
+        }
+
+        #[proptest]
+        fn secp256k1_round_trip(signer: Secp256k1PrivateKey) {
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Secp256k1PrivateKey::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
+        }
+
+        #[proptest]
+        fn secp256r1_round_trip(signer: Secp256r1PrivateKey) {
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Secp256r1PrivateKey::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
+        }
+
+        #[test]
+        fn upstream_ed25519_vector_round_trips() {
+            let keypair = SimpleKeypair::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap();
+            assert_eq!(keypair.scheme(), SignatureScheme::Ed25519);
+            assert_eq!(
+                keypair.to_rtdprivkey().unwrap(),
+                UPSTREAM_ED25519_RTDPRIVKEY
+            );
+
+            // Per-scheme decoder accepts it too.
+            Ed25519PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap();
+            // Wrong-scheme per-scheme decoders reject it.
+            Secp256k1PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap_err();
+            Secp256r1PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap_err();
+        }
+
+        #[test]
+        fn rejects_wrong_hrp() {
+            // Same payload as the upstream Ed25519 vector but encoded with a
+            // different HRP — must fail.
+            let bytes = ::bech32::primitives::decode::CheckedHrpstring::new::<::bech32::Bech32>(
+                UPSTREAM_ED25519_RTDPRIVKEY,
+            )
+            .unwrap()
+            .byte_iter()
+            .collect::<Vec<_>>();
+            let wrong_hrp = ::bech32::Hrp::parse("notrtd").unwrap();
+            let encoded = ::bech32::encode::<::bech32::Bech32>(wrong_hrp, &bytes).unwrap();
+
+            SimpleKeypair::from_rtdprivkey(&encoded).unwrap_err();
+            Ed25519PrivateKey::from_rtdprivkey(&encoded).unwrap_err();
+        }
+
+        #[test]
+        fn rejects_bech32m_checksum() {
+            // Re-encode the upstream Ed25519 payload using the Bech32m
+            // checksum variant. A correctly-implemented decoder must reject
+            // this, since the rtdpriv format uses BIP-173 Bech32 only.
+            let bytes = ::bech32::primitives::decode::CheckedHrpstring::new::<::bech32::Bech32>(
+                UPSTREAM_ED25519_RTDPRIVKEY,
+            )
+            .unwrap()
+            .byte_iter()
+            .collect::<Vec<_>>();
+            let hrp = ::bech32::Hrp::parse("rtdprivkey").unwrap();
+            let bech32m = ::bech32::encode::<::bech32::Bech32m>(hrp, &bytes).unwrap();
+            assert_ne!(bech32m, UPSTREAM_ED25519_RTDPRIVKEY);
+
+            SimpleKeypair::from_rtdprivkey(&bech32m).unwrap_err();
+            Ed25519PrivateKey::from_rtdprivkey(&bech32m).unwrap_err();
+        }
+    }
+
+    // Round-trip and rejection tests for the legacy Base64 keystore format.
+    //
+    // The payload is the same `flag || private_key` bytes as the Bech32
+    // `rtdprivkey` format, encoded as plain Base64 instead. This is the
+    // encoding used for entries of the Rtd CLI's `rtd.keystore` file.
+    mod base64 {
+        use super::*;
+        use rtd_sdk_types::SignatureScheme;
+
+        #[cfg(target_arch = "wasm32")]
+        use wasm_bindgen_test::wasm_bindgen_test as test;
+
+        // The same payload as the bech32 module's upstream Ed25519 vector
+        // (`Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32]))`),
+        // Base64-encoded: 0x00 flag byte followed by the 32 private key
+        // bytes.
+        const UPSTREAM_ED25519_BASE64: &str = "AJv0mmoHVflTgR/OEl8mg9UEKcO7SeB0FH4AiaUurhVf";
+
+        #[proptest]
+        fn ed25519_round_trip(signer: Ed25519PrivateKey) {
+            let encoded = signer.to_base64();
+            let decoded = Ed25519PrivateKey::from_base64(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            // SimpleKeypair dispatch agrees.
+            let keypair = SimpleKeypair::from_base64(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_base64());
+        }
+
+        #[proptest]
+        fn secp256k1_round_trip(signer: Secp256k1PrivateKey) {
+            let encoded = signer.to_base64();
+            let decoded = Secp256k1PrivateKey::from_base64(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            let keypair = SimpleKeypair::from_base64(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_base64());
+        }
+
+        #[proptest]
+        fn secp256r1_round_trip(signer: Secp256r1PrivateKey) {
+            let encoded = signer.to_base64();
+            let decoded = Secp256r1PrivateKey::from_base64(&encoded).unwrap();
+            assert_eq!(decoded.public_key(), signer.public_key());
+
+            let keypair = SimpleKeypair::from_base64(&encoded).unwrap();
+            assert_eq!(keypair.scheme(), signer.scheme());
+            assert_eq!(encoded, keypair.to_base64());
+        }
+
+        #[test]
+        fn upstream_ed25519_vector_round_trips() {
+            let keypair = SimpleKeypair::from_base64(UPSTREAM_ED25519_BASE64).unwrap();
+            assert_eq!(keypair.scheme(), SignatureScheme::Ed25519);
+            assert_eq!(keypair.to_base64(), UPSTREAM_ED25519_BASE64);
+
+            // Per-scheme decoder accepts it too.
+            Ed25519PrivateKey::from_base64(UPSTREAM_ED25519_BASE64).unwrap();
+            // Wrong-scheme per-scheme decoders reject it.
+            Secp256k1PrivateKey::from_base64(UPSTREAM_ED25519_BASE64).unwrap_err();
+            Secp256r1PrivateKey::from_base64(UPSTREAM_ED25519_BASE64).unwrap_err();
+        }
+
+        #[cfg(feature = "bech32")]
+        #[test]
+        fn agrees_with_rtdprivkey_encoding() {
+            // Both encodings carry the same payload, so converting between
+            // them must be lossless.
+            let keypair = SimpleKeypair::from_base64(UPSTREAM_ED25519_BASE64).unwrap();
+            let rtdprivkey = keypair.to_rtdprivkey().unwrap();
+            let round_tripped = SimpleKeypair::from_rtdprivkey(&rtdprivkey).unwrap();
+            assert_eq!(round_tripped.to_base64(), UPSTREAM_ED25519_BASE64);
+        }
+
+        #[test]
+        fn rejects_invalid_input() {
+            // Not Base64 at all.
+            SimpleKeypair::from_base64("not base64!").unwrap_err();
+            Ed25519PrivateKey::from_base64("not base64!").unwrap_err();
+
+            // Valid Base64 but an empty payload (no flag byte).
+            SimpleKeypair::from_base64("").unwrap_err();
+
+            // Valid Base64 but an unknown scheme flag (0xff).
+            use base64ct::Encoding;
+            let payload = base64ct::Base64::decode_vec(UPSTREAM_ED25519_BASE64).unwrap();
+            let mut bad_flag_payload = payload.clone();
+            bad_flag_payload[0] = 0xff;
+            let bad_flag = base64ct::Base64::encode_string(&bad_flag_payload);
+            SimpleKeypair::from_base64(&bad_flag).unwrap_err();
+
+            // Valid Base64 and flag but truncated key bytes.
+            let truncated = base64ct::Base64::encode_string(&payload[..16]);
+            SimpleKeypair::from_base64(&truncated).unwrap_err();
+        }
     }
 }

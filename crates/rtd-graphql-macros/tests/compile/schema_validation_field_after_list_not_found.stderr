@@ -1,0 +1,5 @@
+error: Field 'nonExistent' not found on type 'Checkpoint'. Available fields: digest, sequenceNumber
+ --> tests/compile/schema_validation_field_after_list_not_found.rs:7:20
+  |
+7 |     #[field(path = "checkpoints.nodes[].nonExistent")]
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

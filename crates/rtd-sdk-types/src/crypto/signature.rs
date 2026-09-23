@@ -623,33 +623,46 @@ mod serialization {
             D: serde::Deserializer<'de>,
         {
             if deserializer.is_human_readable() {
-                let readable = ReadableUserSignature::deserialize(deserializer)?;
-                Ok(match readable {
-                    ReadableUserSignature::Ed25519 {
-                        signature,
-                        public_key,
-                    } => Self::Simple(SimpleSignature::Ed25519 {
-                        signature,
-                        public_key,
+                // Try to deserialize as either a plain base64 string OR the tagged enum format
+                #[derive(serde_derive::Deserialize)]
+                #[serde(untagged)]
+                enum UserSignatureHelper {
+                    Base64String(String),
+                    Tagged(ReadableUserSignature),
+                }
+
+                let helper = UserSignatureHelper::deserialize(deserializer)?;
+                match helper {
+                    UserSignatureHelper::Base64String(s) => {
+                        UserSignature::from_base64(&s).map_err(serde::de::Error::custom)
+                    }
+                    UserSignatureHelper::Tagged(readable) => Ok(match readable {
+                        ReadableUserSignature::Ed25519 {
+                            signature,
+                            public_key,
+                        } => Self::Simple(SimpleSignature::Ed25519 {
+                            signature,
+                            public_key,
+                        }),
+                        ReadableUserSignature::Secp256k1 {
+                            signature,
+                            public_key,
+                        } => Self::Simple(SimpleSignature::Secp256k1 {
+                            signature,
+                            public_key,
+                        }),
+                        ReadableUserSignature::Secp256r1 {
+                            signature,
+                            public_key,
+                        } => Self::Simple(SimpleSignature::Secp256r1 {
+                            signature,
+                            public_key,
+                        }),
+                        ReadableUserSignature::Multisig(multisig) => Self::Multisig(multisig),
+                        ReadableUserSignature::ZkLogin(zklogin) => Self::ZkLogin(zklogin),
+                        ReadableUserSignature::Passkey(passkey) => Self::Passkey(passkey),
                     }),
-                    ReadableUserSignature::Secp256k1 {
-                        signature,
-                        public_key,
-                    } => Self::Simple(SimpleSignature::Secp256k1 {
-                        signature,
-                        public_key,
-                    }),
-                    ReadableUserSignature::Secp256r1 {
-                        signature,
-                        public_key,
-                    } => Self::Simple(SimpleSignature::Secp256r1 {
-                        signature,
-                        public_key,
-                    }),
-                    ReadableUserSignature::Multisig(multisig) => Self::Multisig(multisig),
-                    ReadableUserSignature::ZkLogin(zklogin) => Self::ZkLogin(zklogin),
-                    ReadableUserSignature::Passkey(passkey) => Self::Passkey(passkey),
-                })
+                }
             } else {
                 use serde_with::DeserializeAs;
 
@@ -789,7 +802,7 @@ mod serialization {
         #[test]
         fn passkey_fixtures() {
             const FIXTURES: &[&str] = &[
-                "lgIGJUmWDeWIDoxodDQXD2R2YFuP5K65ooYyx5lc87qDHZdjHQAAAACKAXsidHlwZSI6IndlYmF1dGhuLmdldCIsImNoYWxsZW5nZSI6IkFBQUF0X21qRTDxdmJWcFlNNldWNllfb2l4Nko4YU5fOXNiOFNLRmJ1a0JmaVF3Iiwib3JpZ2luIjoiaHR0cDovL2xvY2FsaG9zdDo1MTczIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfWICmOyQv1fJ+inKD0C/sxKtxyFKl9aoBign6p9Ih3iA2ahDVg2CPZqUOlEhur2S2GbIZjbn6TbgWtbXXg8SjLkL7wM9Fw4JO0AKLdnLC1nhQguHBX5K6Hv2ta1sqoOqEFDDEw==",
+                "lgIGJUmWDeWIDoxodDQXD2R2YFuP5K65ooYyx5lc87qDHZdjHQAAAACKAXsidHlwZSI6IndlYmF1dGhuLmdldCIsImNoYWxsZW5nZSI6IkFBQUF0X21qSUIxdmJWcFlNNldWNllfb2l4Nko4YU5fOXNiOFNLRmJ1a0JmaVF3Iiwib3JpZ2luIjoiaHR0cDovL2xvY2FsaG9zdDo1MTczIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfWICmOyQv1fJ+inKD0C/sxKtxyFKl9aoBign6p9Ih3iA2ahDVg2CPZqUOlEhur2S2GbIZjbn6TbgWtbXXg8SjLkL7wM9Fw4JO0AKLdnLC1nhQguHBX5K6Hv2ta1sqoOqEFDDEw==",
             ];
 
             for fixture in FIXTURES {
@@ -833,6 +846,24 @@ mod serialization {
             let json = serde_json::to_string_pretty(&sig).unwrap();
             println!("{json}");
             assert_eq!(sig, serde_json::from_str(&json).unwrap());
+        }
+
+        #[test]
+        fn test_base64_string_deserialization() {
+            const ED25519_BASE64: &str = "ANp47jDZQszLl6ocHM/ShqWvViENf/24lL0ye0qdbd3nmrhqplhiegSWhoGZcpzoWgPltPA413BL0LB0xAaEhw8Nfas1jI2tqk76AEmnWwdDZVWxCjaCGbtoD3BXE0nXdQ==";
+            let compact_json = format!(r#""{}""#, ED25519_BASE64);
+            let sig_from_compact: UserSignature =
+                serde_json::from_str(&compact_json).expect("Should deserialize from base64 string");
+
+            #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+            struct TestCertificate {
+                signature: UserSignature,
+            }
+            let cert_compact = format!(r#"{{"signature": "{}"}}"#, ED25519_BASE64);
+            let cert: TestCertificate = serde_json::from_str(&cert_compact)
+                .expect("Should deserialize with base64 signature");
+
+            assert_eq!(cert.signature, sig_from_compact);
         }
     }
 }

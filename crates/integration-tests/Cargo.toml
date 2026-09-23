@@ -1,0 +1,22 @@
+[package]
+name = "integration-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+base64ct = { version = "1.8.0", features = ["alloc"] }
+serde = "1.0.228"
+serde_derive = "1.0.228"
+serde_yaml = "0.9.34"
+tempfile = "3.24.0"
+tokio = { version = "1.49.0", features = ["time"] }
+anyhow = { version = "1.0.100", features = ["backtrace"] }
+futures = "0.3.31"
+serde_json = "1.0.148"
+
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+rtd-crypto = { path = "../rtd-crypto", features = ["ed25519"] }
+rtd-rpc = { path = "../rtd-rpc", features = [] }
+rtd-sdk-types = { path = "../rtd-sdk-types", features = [] }
+rtd-transaction-builder = { path = "../rtd-transaction-builder", features = [] }

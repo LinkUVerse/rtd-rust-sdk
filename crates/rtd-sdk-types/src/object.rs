@@ -18,7 +18,7 @@ pub type Version = u64;
 /// ```text
 /// object-ref = address u64 digest
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Serialize, serde_derive::Deserialize)
@@ -56,6 +56,77 @@ impl ObjectReference {
     /// Returns the digest of the object that this ObjectReference is referring to.
     pub fn digest(&self) -> &Digest {
         &self.digest
+    }
+
+    /// Construct a synthetic coin reservation reference.
+    ///
+    /// The reservation ref encodes an address-balance reservation for coin
+    /// usage so that the server can reserve the specified `balance` of the
+    /// sender's address balance and transparently create a `Coin<T>` without
+    /// requiring actual coin objects.
+    ///
+    /// See the [coin reservation protocol][cr] for the full specification.
+    ///
+    /// [cr]: https://github.com/linkuverse/rtd/blob/main/crates/rtd-types/src/coin_reservation.rs
+    #[cfg(all(feature = "hash", feature = "serde"))]
+    #[cfg_attr(doc_cfg, doc(cfg(all(feature = "hash", feature = "serde"))))]
+    pub fn coin_reservation(
+        coin_type: &crate::StructTag,
+        balance: u64,
+        epoch: u64,
+        chain_id: Digest,
+        owner: Address,
+    ) -> Self {
+        use super::Identifier;
+
+        // Derive the accumulator object ID for (owner, Balance<RTD>).
+        //
+        // The parent is the accumulator root object (0xacc). The key is
+        // the BCS-serialized owner address. The key type tag is
+        // `accumulator::Key<balance::Balance<RTD>>`.
+        let accumulator_root = const { Address::from_static("0xacc") };
+
+        let balance_rtd_type = StructTag::new(
+            Address::TWO,
+            Identifier::from_static("balance"),
+            Identifier::from_static("Balance"),
+            vec![coin_type.clone().into()],
+        );
+        let key_type_tag: super::TypeTag = StructTag::new(
+            Address::TWO,
+            Identifier::from_static("accumulator"),
+            Identifier::from_static("Key"),
+            vec![balance_rtd_type.into()],
+        )
+        .into();
+
+        let object_id = accumulator_root.derive_dynamic_child_id(&key_type_tag, owner.as_ref());
+
+        // XOR-mask the object ID with the chain identifier to prevent
+        // cross-chain replay.
+        let masked_id = {
+            let id_bytes = object_id.into_inner();
+            let mask_bytes = chain_id.into_inner();
+            let mut masked = [0u8; 32];
+            for i in 0..32 {
+                masked[i] = id_bytes[i] ^ mask_bytes[i];
+            }
+            Address::new(masked)
+        };
+
+        // Construct the magic digest:
+        //   bytes  0-7:  reservation balance (LE u64)
+        //   bytes  8-11: epoch ID (LE u32)
+        //   bytes 12-31: magic constant [0xac; 20]
+        let digest = {
+            let mut bytes = [0u8; 32];
+            bytes[0..8].copy_from_slice(&balance.to_le_bytes());
+            bytes[8..12].copy_from_slice(&(epoch as u32).to_le_bytes());
+            bytes[12..32].copy_from_slice(&[0xac; 20]);
+            Digest::new(bytes)
+        };
+
+        Self::new(masked_id, 0, digest)
     }
 
     /// Returns a 3-tuple containing the object id, version, and digest.
@@ -271,11 +342,7 @@ pub struct UpgradeInfo {
 /// object-contents = uleb128 (address *OCTET) ; length followed by contents
 /// ```
 #[derive(Eq, PartialEq, Debug, Clone, Hash)]
-//TODO hand-roll a Deserialize impl to enforce that an objectid is present
-#[cfg_attr(
-    feature = "serde",
-    derive(serde_derive::Serialize, serde_derive::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde_derive::Serialize))]
 #[cfg_attr(feature = "proptest", derive(test_strategy::Arbitrary))]
 pub struct MoveStruct {
     /// The type of this object
@@ -552,9 +619,13 @@ mod serialization {
         StakedRtd,
         /// A non-RTD coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::rtd::RTD`)
         Coin(TypeTag),
-        // NOTE: if adding a new type here, and there are existing on-chain objects of that
-        // type with Other(_), that is ok, but you must hand-roll PartialEq/Eq/Ord/maybe Hash
-        // to make sure the new type and Other(_) are interpreted consistently.
+        /// A RTD balance accumulator field
+        /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<0x2::rtd::RTD>>, 0x2::accumulator::U128>`)
+        RtdBalanceAccumulatorField,
+        /// A non-RTD balance accumulator field
+        /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<T>>, 0x2::accumulator::U128>`
+        /// where T != 0x2::rtd::RTD)
+        BalanceAccumulatorField(TypeTag),
     }
 
     /// See `MoveStructType`
@@ -568,9 +639,13 @@ mod serialization {
         StakedRtd,
         /// A non-RTD coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::rtd::RTD`)
         Coin(&'a TypeTag),
-        // NOTE: if adding a new type here, and there are existing on-chain objects of that
-        // type with Other(_), that is ok, but you must hand-roll PartialEq/Eq/Ord/maybe Hash
-        // to make sure the new type and Other(_) are interpreted consistently.
+        /// A RTD balance accumulator field
+        /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<0x2::rtd::RTD>>, 0x2::accumulator::U128>`)
+        RtdBalanceAccumulatorField,
+        /// A non-RTD balance accumulator field
+        /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<T>>, 0x2::accumulator::U128>`
+        /// where T != 0x2::rtd::RTD)
+        BalanceAccumulatorField(&'a TypeTag),
     }
 
     impl MoveStructType {
@@ -580,6 +655,26 @@ mod serialization {
                 MoveStructType::GasCoin => StructTag::gas_coin(),
                 MoveStructType::StakedRtd => StructTag::staked_rtd(),
                 MoveStructType::Coin(type_tag) => StructTag::coin(type_tag),
+                MoveStructType::RtdBalanceAccumulatorField => {
+                    StructTag::balance_accumulator_field(StructTag::rtd().into())
+                }
+                MoveStructType::BalanceAccumulatorField(type_tag) => {
+                    StructTag::balance_accumulator_field(type_tag)
+                }
+            }
+        }
+
+        /// Wire-format variant index. Used to compare a parsed
+        /// `MoveStructType` against the canonical encoding produced by
+        /// `MoveStructTypeRef::from_struct_tag`.
+        fn variant_index(&self) -> u8 {
+            match self {
+                Self::Other(_) => 0,
+                Self::GasCoin => 1,
+                Self::StakedRtd => 2,
+                Self::Coin(_) => 3,
+                Self::RtdBalanceAccumulatorField => 4,
+                Self::BalanceAccumulatorField(_) => 5,
             }
         }
     }
@@ -592,30 +687,40 @@ mod serialization {
             let type_params = s.type_params();
 
             if let Some(coin_type) = s.is_coin() {
-                if let TypeTag::Struct(s_inner) = coin_type {
-                    let address = s_inner.address();
-                    let module = s_inner.module();
-                    let name = s_inner.name();
-                    let type_params = s_inner.type_params();
-
-                    if address == &Address::TWO
-                        && module == "rtd"
-                        && name == "RTD"
-                        && type_params.is_empty()
-                    {
-                        return Self::GasCoin;
-                    }
+                if let TypeTag::Struct(s_inner) = coin_type
+                    && s_inner.is_gas()
+                {
+                    Self::GasCoin
+                } else {
+                    Self::Coin(coin_type)
                 }
-
-                Self::Coin(coin_type)
             } else if address == &Address::THREE
                 && module == "staking_pool"
                 && name == "StakedRtd"
                 && type_params.is_empty()
             {
                 Self::StakedRtd
+            } else if let Some(coin_type) = s.is_balance_accumulator_field() {
+                if let TypeTag::Struct(s_inner) = coin_type
+                    && s_inner.is_gas()
+                {
+                    Self::RtdBalanceAccumulatorField
+                } else {
+                    Self::BalanceAccumulatorField(coin_type)
+                }
             } else {
                 Self::Other(s)
+            }
+        }
+
+        fn variant_index(&self) -> u8 {
+            match self {
+                Self::Other(_) => 0,
+                Self::GasCoin => 1,
+                Self::StakedRtd => 2,
+                Self::Coin(_) => 3,
+                Self::RtdBalanceAccumulatorField => 4,
+                Self::BalanceAccumulatorField(_) => 5,
             }
         }
     }
@@ -637,8 +742,67 @@ mod serialization {
         where
             D: Deserializer<'de>,
         {
-            let struct_type = MoveStructType::deserialize(deserializer)?;
-            Ok(struct_type.into_struct_tag())
+            // Enforce that the wire form matches the canonical encoding for
+            // the resulting `StructTag`. Without this, the same logical
+            // value could be reached from multiple BCS byte strings (e.g.
+            // `Other(0x2::coin::Coin<0x2::rtd::RTD>)` vs `GasCoin`), but
+            // re-serializing via `MoveStructTypeRef::from_struct_tag` would
+            // always emit the specialized form, breaking byte-faithful
+            // round-trips and any downstream digest computed over them.
+            let parsed = MoveStructType::deserialize(deserializer)?;
+            let parsed_idx = parsed.variant_index();
+            let tag = parsed.into_struct_tag();
+            let canonical_idx = MoveStructTypeRef::from_struct_tag(&tag).variant_index();
+            if parsed_idx != canonical_idx {
+                return Err(serde::de::Error::custom(format!(
+                    "non-canonical MoveStructType encoding: variant {parsed_idx} \
+                     would be re-encoded as variant {canonical_idx}",
+                )));
+            }
+            Ok(tag)
+        }
+    }
+
+    /// Mirror of `MoveStruct`'s fields used solely as a deserialization
+    /// target. Lets us validate `contents` after the wire decode but before
+    /// the value reaches the public type, where `object_id()` would otherwise
+    /// panic on truncated input.
+    #[derive(serde_derive::Deserialize)]
+    struct RawMoveStruct {
+        #[serde(with = "::serde_with::As::<BinaryMoveStructType>")]
+        type_: StructTag,
+        has_public_transfer: bool,
+        version: Version,
+        #[serde(with = "crate::_serde::ReadableBase64Encoded")]
+        contents: Vec<u8>,
+    }
+
+    impl<'de> Deserialize<'de> for MoveStruct {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let RawMoveStruct {
+                type_,
+                has_public_transfer,
+                version,
+                contents,
+            } = RawMoveStruct::deserialize(deserializer)?;
+
+            if contents.len() < Address::LENGTH {
+                return Err(serde::de::Error::custom(format!(
+                    "MoveStruct contents must be at least {} bytes (object id), got {}",
+                    Address::LENGTH,
+                    contents.len(),
+                )));
+            }
+
+            Ok(MoveStruct {
+                type_,
+                has_public_transfer,
+                version,
+                contents,
+            })
         }
     }
 
@@ -674,6 +838,8 @@ mod serialization {
 
     #[cfg(test)]
     mod test {
+        use crate::bcs::FromBcs;
+        use crate::bcs::ToBcs;
         use crate::object::Object;
 
         #[cfg(target_arch = "wasm32")]
@@ -788,6 +954,170 @@ mod serialization {
                 let json = serde_json::to_string_pretty(&object).unwrap();
                 println!("{json}");
                 assert_eq!(object, serde_json::from_str(&json).unwrap());
+            }
+        }
+
+        // Test to ensure we properly serialize and deserialize the new MoveStructType variants for
+        // address balances
+        #[test]
+        fn address_balance_objects() {
+            let non_rtd_address_balance_type = "AAUHIRSU0QWQjjOQW/wFv4O24+PddAa8JQ45YwhB+i7EfzgGY29pbl9hBkNPSU5fQQAAEAAAAAAAAABQCSgWThHEQ1NqPKQQsXVKd/yFD0FSDYUtrvXx1xt+jIk0Bsyk3bbd4hLE1MDxwok6jzp0k3365HVXhJgmi+4vjcQJAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACswgmPj1SN1ZkPLtiVtVs0XD3QCgS/YYUFBh9Q6p4b+zoJAAAAAAAAAAAA==";
+
+            let non_rtd = Object::from_bcs_base64(non_rtd_address_balance_type).unwrap();
+            assert_eq!(
+                non_rtd.to_bcs_base64().unwrap(),
+                non_rtd_address_balance_type
+            );
+
+            let rtd_address_balance_type = "AAQAAgAAAAAAAABQlJ321C1hKFc15SQmGZUdTDrwVh7xQ46GoV2zEnFK88b/JOPl1wGyhHd/R1itnNXhAzGoyXuDHuOL3V34auvxf+gDAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACswgjRbaObiwu6bn07xewfd3V9iFJfbhcaWy7K6YgNsZdKkAAAAAAAAAAA==";
+
+            let rtd = Object::from_bcs_base64(rtd_address_balance_type).unwrap();
+            assert_eq!(rtd.to_bcs_base64().unwrap(), rtd_address_balance_type);
+        }
+
+        // Regression test: deserializing a `MoveStruct` whose `contents` is
+        // shorter than the 32-byte object id used to make `object_id()`
+        // panic via `id_opt(...).unwrap()`. Both BCS and JSON paths must
+        // reject the truncated input rather than produce a value that will
+        // panic on the next `object_id()` call.
+        #[test]
+        fn truncated_move_struct_contents_is_rejected() {
+            // BCS layout: ObjectData::Struct(0x00) | GasCoin tag (0x01) |
+            // has_public_transfer (0x00) | version u64 (8 bytes) |
+            // contents uleb128 length (10) | contents (10 bytes) |
+            // Owner::Immutable (0x03) | digest (1+32 bytes) |
+            // storage_rebate u64 (8 bytes).
+            let mut bytes = Vec::new();
+            bytes.push(0x00);
+            bytes.push(0x01);
+            bytes.push(0x00);
+            bytes.extend_from_slice(&[0u8; 8]);
+            bytes.push(0x0a);
+            bytes.extend_from_slice(&[0u8; 10]);
+            bytes.push(0x03);
+            bytes.push(0x20);
+            bytes.extend_from_slice(&[0u8; 32]);
+            bytes.extend_from_slice(&[0u8; 8]);
+
+            let bcs_err = bcs::from_bytes::<Object>(&bytes).unwrap_err();
+            assert!(
+                bcs_err.to_string().contains("MoveStruct contents"),
+                "unexpected BCS error: {bcs_err}"
+            );
+
+            let json = serde_json::json!({
+                "data": {
+                    "Struct": {
+                        "type_": "GasCoin",
+                        "has_public_transfer": false,
+                        "version": 0,
+                        "contents": "AAAAAAAAAAAAAA=="
+                    }
+                },
+                "owner": "immutable",
+                "previous_transaction":
+                    "11111111111111111111111111111111",
+                "storage_rebate": 0,
+            });
+            let json_err = serde_json::from_value::<Object>(json).unwrap_err();
+            assert!(
+                json_err.to_string().contains("MoveStruct contents"),
+                "unexpected JSON error: {json_err}"
+            );
+        }
+
+        // Regression test: a non-canonical `MoveStructType` wire form (e.g.
+        // `Other(GasCoin's StructTag)`) used to deserialize successfully and
+        // then re-serialize as the specialized variant, producing different
+        // BCS bytes from the same logical value. Each non-canonical encoding
+        // must now be rejected at deserialization.
+        #[test]
+        fn non_canonical_move_struct_type_is_rejected() {
+            use crate::StructTag;
+            use crate::TypeTag;
+
+            // Build a complete `Object` BCS payload around a
+            // caller-supplied `type_` byte sequence. Everything else
+            // (contents, owner, digest, rebate) is canonical and valid so
+            // the only possible failure is the `type_` canonicalization
+            // check.
+            fn object_bytes_with_type(type_bytes: &[u8]) -> Vec<u8> {
+                let mut bytes = Vec::new();
+                bytes.push(0x00); // ObjectData::Struct
+                bytes.extend_from_slice(type_bytes);
+                bytes.push(0x00); // has_public_transfer
+                bytes.extend_from_slice(&[0u8; 8]); // version
+                bytes.push(0x20); // contents uleb128 length = 32
+                bytes.extend_from_slice(&[0u8; 32]); // contents (valid id)
+                bytes.push(0x03); // Owner::Immutable
+                bytes.push(0x20); // digest length prefix
+                bytes.extend_from_slice(&[0u8; 32]); // digest
+                bytes.extend_from_slice(&[0u8; 8]); // storage_rebate
+                bytes
+            }
+
+            // BCS encodes enum tags as uleb128, which is a single byte for
+            // values 0-127. Variant indices used here:
+            //   0 = Other(StructTag)
+            //   3 = Coin(TypeTag)
+            //   5 = BalanceAccumulatorField(TypeTag)
+            let cases: Vec<(&str, Vec<u8>)> = vec![
+                (
+                    "Other(GasCoin tag)",
+                    [&[0u8][..], &bcs::to_bytes(&StructTag::gas_coin()).unwrap()].concat(),
+                ),
+                (
+                    "Other(StakedRtd tag)",
+                    [
+                        &[0u8][..],
+                        &bcs::to_bytes(&StructTag::staked_rtd()).unwrap(),
+                    ]
+                    .concat(),
+                ),
+                (
+                    "Other(Coin<non-RTD> tag)",
+                    [
+                        &[0u8][..],
+                        &bcs::to_bytes(&StructTag::coin(TypeTag::U64)).unwrap(),
+                    ]
+                    .concat(),
+                ),
+                (
+                    "Other(RtdBalanceAccumulatorField tag)",
+                    [
+                        &[0u8][..],
+                        &bcs::to_bytes(&StructTag::balance_accumulator_field(
+                            StructTag::rtd().into(),
+                        ))
+                        .unwrap(),
+                    ]
+                    .concat(),
+                ),
+                (
+                    "Coin(RTD's TypeTag)",
+                    [
+                        &[3u8][..],
+                        &bcs::to_bytes(&TypeTag::from(StructTag::rtd())).unwrap(),
+                    ]
+                    .concat(),
+                ),
+                (
+                    "BalanceAccumulatorField(RTD's TypeTag)",
+                    [
+                        &[5u8][..],
+                        &bcs::to_bytes(&TypeTag::from(StructTag::rtd())).unwrap(),
+                    ]
+                    .concat(),
+                ),
+            ];
+
+            for (label, type_bytes) in cases {
+                let bytes = object_bytes_with_type(&type_bytes);
+                let err = bcs::from_bytes::<Object>(&bytes).unwrap_err();
+                assert!(
+                    err.to_string().contains("non-canonical MoveStructType"),
+                    "{label}: unexpected error: {err}"
+                );
             }
         }
     }

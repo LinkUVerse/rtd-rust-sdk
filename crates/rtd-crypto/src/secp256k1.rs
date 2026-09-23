@@ -2,13 +2,13 @@ use crate::SignatureError;
 use k256::ecdsa::SigningKey;
 use k256::ecdsa::VerifyingKey;
 use k256::elliptic_curve::group::GroupEncoding;
-use signature::Signer;
-use signature::Verifier;
 use rtd_sdk_types::Secp256k1PublicKey;
 use rtd_sdk_types::Secp256k1Signature;
 use rtd_sdk_types::SignatureScheme;
 use rtd_sdk_types::SimpleSignature;
 use rtd_sdk_types::UserSignature;
+use signature::Signer;
+use signature::Verifier;
 
 #[derive(Clone)]
 pub struct Secp256k1PrivateKey(SigningKey);
@@ -109,6 +109,64 @@ impl Secp256k1PrivateKey {
     #[cfg(feature = "pem")]
     pub(crate) fn from_k256(private_key: SigningKey) -> Self {
         Self(private_key)
+    }
+
+    /// Build a key from the scheme flag and key bytes of a decoded
+    /// `flag || private_key` payload.
+    fn from_flagged_key_bytes(
+        scheme: SignatureScheme,
+        key: Vec<u8>,
+    ) -> Result<Self, SignatureError> {
+        if scheme != SignatureScheme::Secp256k1 {
+            return Err(SignatureError::from_source(format!(
+                "private key scheme flag is `{}`, expected `secp256k1`",
+                scheme.name(),
+            )));
+        }
+        let bytes: [u8; Self::LENGTH] = key.try_into().map_err(|_: Vec<u8>| {
+            SignatureError::from_source("private key has invalid length for secp256k1")
+        })?;
+        Self::new(bytes)
+    }
+
+    #[cfg(feature = "bech32")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+    /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
+    ///
+    /// Returns an error if the string does not have the `rtdprivkey` HRP, has
+    /// an invalid Bech32 (BIP-173) checksum, has a flag byte that is not
+    /// Secp256k1, has the wrong number of key bytes, or carries bytes that do
+    /// not form a valid secp256k1 scalar.
+    pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode(s)?;
+        Self::from_flagged_key_bytes(scheme, key)
+    }
+
+    #[cfg(feature = "bech32")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
+    /// Encode this private key as a Bech32 `rtdprivkey` string.
+    pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
+        let bytes = self.0.to_bytes();
+        crate::rtdpriv::encode(SignatureScheme::Secp256k1, &bytes)
+    }
+
+    /// Decode a Base64 `flag || private_key` string, the legacy keystore
+    /// format used for entries of the Rtd CLI's `rtd.keystore` file.
+    ///
+    /// Returns an error if the string is not valid Base64, has a flag byte
+    /// that is not Secp256k1, has the wrong number of key bytes, or carries
+    /// bytes that do not form a valid secp256k1 scalar.
+    pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
+        Self::from_flagged_key_bytes(scheme, key)
+    }
+
+    /// Encode this private key as a Base64 `flag || private_key` string, the
+    /// legacy keystore format used for entries of the Rtd CLI's
+    /// `rtd.keystore` file.
+    pub fn to_base64(&self) -> String {
+        let bytes = self.0.to_bytes();
+        crate::rtdpriv::encode_base64(SignatureScheme::Secp256k1, &bytes)
     }
 }
 

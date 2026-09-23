@@ -9,7 +9,7 @@ use prost_types::FileDescriptorSet;
 use prost_types::field_descriptor_proto::Type;
 use quote::quote;
 
-pub(crate) fn generate_field_info(packages: &HashMap<String, FileDescriptorSet>, out_dir: &Path) {
+pub fn generate_field_info(packages: &HashMap<String, FileDescriptorSet>, out_dir: &Path) {
     for (package, fds) in packages {
         if package.contains("google") {
             continue;
@@ -25,7 +25,7 @@ pub(crate) fn generate_field_info(packages: &HashMap<String, FileDescriptorSet>,
         }
 
         let code = quote! {
-            mod _field_impls {
+            pub(crate) mod _field_impls {
                 #![allow(clippy::wrong_self_convention)]
 
                 use super::*;

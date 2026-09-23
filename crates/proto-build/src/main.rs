@@ -3,49 +3,52 @@ use protox::prost::Message as _;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::message_graph::DescriptorGraph;
-
-mod codegen;
-mod comments;
-mod context;
-mod generate_fields;
-mod ident;
-mod message_graph;
+use proto_build::codegen;
+use proto_build::context;
+use proto_build::generate_fields;
+use proto_build::message_graph::DescriptorGraph;
 
 fn main() {
     let root_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"));
-    let proto_dir = root_dir
+    let vendored_proto_dir = root_dir
         .join("../rtd-rpc/vendored/proto")
         .canonicalize()
         .unwrap();
+    let local_proto_dir = root_dir.join("../rtd-rpc/proto").canonicalize().unwrap();
     let out_dir = root_dir
         .join("../rtd-rpc/src/proto/generated")
         .canonicalize()
         .unwrap();
 
     let proto_ext = std::ffi::OsStr::new("proto");
-    let proto_files = walkdir::WalkDir::new(&proto_dir)
-        .into_iter()
-        .filter_map(|entry| {
-            (|| {
-                let entry = entry?;
-                if entry.file_type().is_dir() {
-                    return Ok(None);
-                }
+    let mut proto_files = Vec::new();
+    for proto_dir in [&vendored_proto_dir, &local_proto_dir] {
+        proto_files.extend(
+            walkdir::WalkDir::new(proto_dir)
+                .into_iter()
+                .filter_map(|entry| {
+                    (|| {
+                        let entry = entry?;
+                        if entry.file_type().is_dir() {
+                            return Ok(None);
+                        }
 
-                let path = entry.into_path();
-                if path.extension() != Some(proto_ext) {
-                    return Ok(None);
-                }
+                        let path = entry.into_path();
+                        if path.extension() != Some(proto_ext) {
+                            return Ok(None);
+                        }
 
-                Ok(Some(path))
-            })()
-            .transpose()
-        })
-        .collect::<Result<Vec<_>, walkdir::Error>>()
-        .unwrap();
+                        Ok(Some(path))
+                    })()
+                    .transpose()
+                })
+                .collect::<Result<Vec<_>, walkdir::Error>>()
+                .unwrap(),
+        );
+    }
+    proto_files.sort();
 
-    let mut fds = protox::Compiler::new(std::slice::from_ref(&proto_dir))
+    let mut fds = protox::Compiler::new([vendored_proto_dir, local_proto_dir])
         .unwrap()
         .include_source_info(true)
         .include_imports(true)
@@ -62,9 +65,23 @@ fn main() {
         .boxed(".rtd.rpc.v2.Input.literal")
         .boxed(".rtd.rpc.v2.Epoch.system_state")
         .boxed("json")
+        .boxed(".rtd.rpc.v2.Object.display")
         .message_attribute(".rtd.rpc", "#[non_exhaustive]")
         .enum_attribute(".rtd.rpc", "#[non_exhaustive]")
+        // prost-build refuses to derive Eq and Hash for any message with a
+        // repeated message-typed field, even when the element type is
+        // eligible, and its eligibility computation ignores manually added
+        // derives. SubscribeCheckpointsRequest derived both traits before it
+        // gained the filter field, so derive them explicitly (along with the
+        // filter types its derives depend on) to keep its API compatible.
+        .type_attribute(".rtd.rpc.v2.TransactionFilter", "#[derive(Eq, Hash)]")
+        .type_attribute(".rtd.rpc.v2.TransactionTerm", "#[derive(Eq, Hash)]")
+        .type_attribute(
+            ".rtd.rpc.v2.SubscribeCheckpointsRequest",
+            "#[derive(Eq, Hash)]",
+        )
         .btree_map(".")
+        .generate_default_stubs(true)
         .out_dir(&out_dir)
         .compile_fds(fds.clone())
     {

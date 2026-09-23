@@ -10,7 +10,11 @@ pub mod proto;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "faucet")))]
 pub mod faucet;
 
+#[cfg(feature = "unstable")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "unstable")))]
+pub mod light_client;
+
 pub use client::Client;
 
 #[doc(hidden)]
-mod _serde;
+pub mod _serde;

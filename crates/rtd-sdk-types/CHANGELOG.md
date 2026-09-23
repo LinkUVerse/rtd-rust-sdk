@@ -1,3 +1,183 @@
+# [0.4.0] - 2026-09-09
+
+## Added
+- [#288] add `EndOfEpochTransactionKind::ForwardingAddressRegistryCreate`,
+  the end-of-epoch transaction that creates the forwarding address registry
+  system object
+- [#295] [#310] add `WithdrawFrom::SenderAllowance` for withdrawing from a
+  funder's balance under an allowance object granted to the sender of the
+  transaction
+- [#297] add `CommandArgumentError::InvalidTxContext`, reported when a
+  programmable transaction command violates the adapter's `TxContext`
+  signature restrictions
+- [#293] add `TransactionExpiration::Validity` and the `AllowedProposers`
+  type for restricting which validators may propose a transaction in
+  consensus
+
+## Breaking
+- [#293] `TransactionExpiration` no longer implements `Copy`, since the new
+  `Validity` variant holds a `Vec` of allowed proposers
+- [#295] [#310] `WithdrawFrom` now has a struct variant, so its variants no
+  longer have well-defined discriminants and cannot be cast with `as`
+
+[#288]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/288
+[#293]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/293
+[#295]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/295
+[#297]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/297
+[#310]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/310
+
+# [0.3.2] - 2026-07-16
+
+## Added
+- [`bcfcd91e`] [`52f51fd0`] [`befe3f54`] add a Blake2b256 Merkle tree in a
+  new `merkle` module, with `MerkleTree`, `MerkleProof`, and
+  `MerkleNonInclusionProof` for inclusion and sorted-leaf non-inclusion
+  proofs, under the `unstable` feature
+- [`6d91aa80`] [`6674ad28`] [`32a2403f`] [`acfe8246`] add OCS proof verifier
+  types in a new `proof` module (`OcsInclusionProof`, `OcsNonInclusionProof`,
+  and `OcsProof`) for authenticating an object's presence in, or an object
+  id's absence from, a checkpoint's modified-objects Merkle tree, under the
+  `unstable` feature
+- [`7588793e`] [`7f44d18e`] [`1aac6205`] [`9c2ba58d`] add authenticated
+  event stream primitives to the `framework` module under the `unstable`
+  feature: `EventCommitment`, `EventStreamHead`, `build_event_merkle_root`,
+  `apply_stream_updates`, and `derive_event_stream_head_object_id`
+- [`7588793e`] add `Event::digest` computing the framework's unsalted
+  per-event digest (`hash` and `serde` features)
+- [`55e4bde0`] add `transaction_digest`, `events_digest`, and an
+  `object_changes` iterator on `TransactionEffects`
+- [`779582ff`] derive `PartialOrd` and `Ord` for `ObjectReference`
+- [`9d9524ea`] expose `U256` as a public newtype matching Move's `u256`
+  primitive, along with `U256ParseError`
+- [#282] add `ZkLoginClaim::decoded_extended_claim` (`serde` feature)
+
+## Changed
+- [#252] document `MultisigCommittee::is_valid` as a caller obligation for
+  consumers that inspect a deserialized committee without verifying
+  signatures
+
+## Fixed
+- [#246] reject truncated `MoveStruct` contents on deserialize instead of
+  panicking on a later `object_id()` call
+- [#248] fix panic when parsing wrong-length base64 strings into key and
+  signature types
+- [#249] reject trailing elements when deserializing
+  `SignedTransactionWithIntentMessage` from formats without a size hint
+- [#250] include `legacy_bitmap` in `MultisigAggregatedSignature` equality
+  so `==` implies BCS byte equality
+- [#251] reject non-canonical BCS encodings of `MoveStructType`
+- [#253] add depth and node-count bounds to `TypeTag` and `StructTag`
+  parsing, enforced uniformly for both string and BCS deserialization
+- [`0014bef5`] clamp `Vec<TypeTag>` preallocation during BCS
+  deserialization by the node-count budget to prevent huge allocation
+  requests from tiny payloads
+- [`f21c30e1`] reject trailing bytes when decoding `Bitmap` from BCS
+- [`ed2256a0`] reject multisig JSON where `bitmap` and `legacy_bitmap`
+  encode different signer sets
+- [`13e7a698`] reject multisig JSON combining a legacy bitmap with zklogin
+  or passkey members, which would panic on the first `to_bytes()` call
+- [`718dbc04`] reject non-canonical `Bn254FieldElement` encodings
+- [`2d718b55`] avoid a `u8` overflow on long claim values in the zklogin
+  base64 helper
+- [#257] reject `Address::from_hex("0x")` as empty input instead of
+  silently parsing it as the zero address
+
+[#246]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/246
+[#248]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/248
+[#249]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/249
+[#250]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/250
+[#251]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/251
+[#252]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/252
+[#253]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/253
+[#257]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/257
+[#282]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/282
+
+[`bcfcd91e`]: https://github.com/linkuverse/rtd-rust-sdk/commit/bcfcd91e
+[`52f51fd0`]: https://github.com/linkuverse/rtd-rust-sdk/commit/52f51fd0
+[`befe3f54`]: https://github.com/linkuverse/rtd-rust-sdk/commit/befe3f54
+[`6d91aa80`]: https://github.com/linkuverse/rtd-rust-sdk/commit/6d91aa80
+[`6674ad28`]: https://github.com/linkuverse/rtd-rust-sdk/commit/6674ad28
+[`32a2403f`]: https://github.com/linkuverse/rtd-rust-sdk/commit/32a2403f
+[`acfe8246`]: https://github.com/linkuverse/rtd-rust-sdk/commit/acfe8246
+[`7588793e`]: https://github.com/linkuverse/rtd-rust-sdk/commit/7588793e
+[`7f44d18e`]: https://github.com/linkuverse/rtd-rust-sdk/commit/7f44d18e
+[`1aac6205`]: https://github.com/linkuverse/rtd-rust-sdk/commit/1aac6205
+[`9c2ba58d`]: https://github.com/linkuverse/rtd-rust-sdk/commit/9c2ba58d
+[`55e4bde0`]: https://github.com/linkuverse/rtd-rust-sdk/commit/55e4bde0
+[`779582ff`]: https://github.com/linkuverse/rtd-rust-sdk/commit/779582ff
+[`9d9524ea`]: https://github.com/linkuverse/rtd-rust-sdk/commit/9d9524ea
+[`0014bef5`]: https://github.com/linkuverse/rtd-rust-sdk/commit/0014bef5
+[`f21c30e1`]: https://github.com/linkuverse/rtd-rust-sdk/commit/f21c30e1
+[`ed2256a0`]: https://github.com/linkuverse/rtd-rust-sdk/commit/ed2256a0
+[`13e7a698`]: https://github.com/linkuverse/rtd-rust-sdk/commit/13e7a698
+[`718dbc04`]: https://github.com/linkuverse/rtd-rust-sdk/commit/718dbc04
+[`2d718b55`]: https://github.com/linkuverse/rtd-rust-sdk/commit/2d718b55
+
+# [0.3.1] - 2026-04-13
+
+## Added
+- [#238] add `ObjectReference::coin_reservation` for constructing synthetic
+  coin reservation references that encode an address-balance reservation
+  for the server to transparently materialize as a coin input
+
+[#238]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/238
+
+# [0.3.0] - 2026-03-23
+
+## Added
+- [#231] add support for `AccumulatorValue::EventDigest` and `AccumulatorValue::IntegerTuple`
+  for authenticated event streams
+- `AccumulatorValue` is now a public type
+
+## Breaking
+- [#231] `AccumulatorWrite::new()` now takes an `AccumulatorValue` directly instead of `u64`
+- [#231] `AccumulatorWrite::value()` now returns `&AccumulatorValue` instead of `u64`
+
+## Fixed
+- [#226] limit type tag parsing depth to prevent stack overflow
+
+[#226]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/226
+[#231]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/231
+
+# [0.2.2] - 2026-01-20
+
+## Added
+- [#202] add support for TransactionKind::ProgrammableSystemTransaction
+- [#204] add support for EndOfEpochTransactionKind::WriteAccumulatorStorageCost
+
+## Fixed
+- [#190] fix bcs serialized format of Reservation for FundsWithdrawal
+  transaction input.
+
+[#190]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/190
+[#202]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/202
+[#204]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/204
+
+# [0.2.1] - 2026-01-07
+
+## Fixed
+- [#186] fix ser/de of the efficient StructTag serialization used in Object
+  serialization for the new address balance accumulator types.
+
+[#186]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/186
+
+# [0.2.0] - 2026-01-05
+
+## Breaking
+- `Input::Shared` changed to support new `Mutability` enum instead of it being a boolean [#179]
+- Reworked the CheckpointContents and CheckpointTransactionInfo types to support contents v2 [#180]
+
+## Added
+- Added support for address balances [#179]
+- Added support for address aliases [#177]
+- Added support for CheckpointContents V2 [#180]
+- Added support for deserializing UserSignatures from base64 in human-readable formats [#182]
+
+[#177]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/177
+[#179]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/179
+[#180]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/180
+[#182]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/182
+
 # [0.1.1] - 2025-12-11
 
 ## Added
@@ -13,8 +193,8 @@
 - Updated to rust 2024 edition [#171]
 - Made `StructTag` fields private [#175]
 
-[`08e2ec32`]: https://github.com/linkulabs/rtd-rust-sdk/commit/08e2ec32
-[`36187fdf`]: https://github.com/linkulabs/rtd-rust-sdk/commit/36187fdf
+[`08e2ec32`]: https://github.com/linkuverse/rtd-rust-sdk/commit/08e2ec32
+[`36187fdf`]: https://github.com/linkuverse/rtd-rust-sdk/commit/36187fdf
 [#171]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/171
 [#175]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/175
 
@@ -32,7 +212,7 @@
 [#165]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/165
 [#150]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/150
 [#145]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/145
-[`8e80c8eb`]: https://github.com/linkulabs/rtd-rust-sdk/commit/8e80c8eb
+[`8e80c8eb`]: https://github.com/linkuverse/rtd-rust-sdk/commit/8e80c8eb
 [#126]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/126
 
 # [0.0.7] - 2025-08-29
@@ -56,16 +236,16 @@
 
 - Fixed typos ([`4c426996`])
 
-[`c08b6b69`]: https://github.com/linkulabs/rtd-rust-sdk/commit/c08b6b69
-[`c5cc14b6`]: https://github.com/linkulabs/rtd-rust-sdk/commit/c5cc14b6
-[`fd36eb13`]: https://github.com/linkulabs/rtd-rust-sdk/commit/fd36eb13
-[`8b9c14f0`]: https://github.com/linkulabs/rtd-rust-sdk/commit/8b9c14f0
-[`ceeee4a3`]: https://github.com/linkulabs/rtd-rust-sdk/commit/ceeee4a3
-[`cab42748`]: https://github.com/linkulabs/rtd-rust-sdk/commit/cab42748
-[`2e24c6d6`]: https://github.com/linkulabs/rtd-rust-sdk/commit/2e24c6d6
-[`358569a7`]: https://github.com/linkulabs/rtd-rust-sdk/commit/358569a7
-[`d9719506`]: https://github.com/linkulabs/rtd-rust-sdk/commit/d9719506
-[`4c426996`]: https://github.com/linkulabs/rtd-rust-sdk/commit/4c426996
+[`c08b6b69`]: https://github.com/linkuverse/rtd-rust-sdk/commit/c08b6b69
+[`c5cc14b6`]: https://github.com/linkuverse/rtd-rust-sdk/commit/c5cc14b6
+[`fd36eb13`]: https://github.com/linkuverse/rtd-rust-sdk/commit/fd36eb13
+[`8b9c14f0`]: https://github.com/linkuverse/rtd-rust-sdk/commit/8b9c14f0
+[`ceeee4a3`]: https://github.com/linkuverse/rtd-rust-sdk/commit/ceeee4a3
+[`cab42748`]: https://github.com/linkuverse/rtd-rust-sdk/commit/cab42748
+[`2e24c6d6`]: https://github.com/linkuverse/rtd-rust-sdk/commit/2e24c6d6
+[`358569a7`]: https://github.com/linkuverse/rtd-rust-sdk/commit/358569a7
+[`d9719506`]: https://github.com/linkuverse/rtd-rust-sdk/commit/d9719506
+[`4c426996`]: https://github.com/linkuverse/rtd-rust-sdk/commit/4c426996
 
 # [0.0.6] - 2025-07-16
 
@@ -78,7 +258,7 @@
 - Removed bespoke json serde impls for various types [`0c383a17`]
 
 [#117]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/117
-[`0c383a17`]: https://github.com/linkulabs/rtd-rust-sdk/commit/0c383a177f80ac44876e70367c51b1ab3c5ea043
+[`0c383a17`]: https://github.com/linkuverse/rtd-rust-sdk/commit/0c383a177f80ac44876e70367c51b1ab3c5ea043
 
 # [0.0.5] - 2025-06-12
 
@@ -88,8 +268,8 @@
 - Added support for deriving ZkLoginPublicIdentifier from ZkLoginInputs ([`ce2b6b4d`])
 - Added support for passkeys in multisigs ([`5b61c62a`])
 
-[`ce2b6b4d`]: https://github.com/linkulabs/rtd-rust-sdk/commit/ce2b6b4d149c44d08bc89a1bf051762dfdb30e9e
-[`5b61c62a`]: https://github.com/linkulabs/rtd-rust-sdk/commit/5b61c62acdb36a11ee7df531f8e7f57ed841ae59
+[`ce2b6b4d`]: https://github.com/linkuverse/rtd-rust-sdk/commit/ce2b6b4d149c44d08bc89a1bf051762dfdb30e9e
+[`5b61c62a`]: https://github.com/linkuverse/rtd-rust-sdk/commit/5b61c62acdb36a11ee7df531f8e7f57ed841ae59
 
 # [0.0.4] - 2025-03-31
 
@@ -113,9 +293,9 @@
 
 - Renamed `to_address` to `derive_address` for all authenticators [`2442379`]
 
-[`2442379`]: https://github.com/linkulabs/rtd-rust-sdk/commit/2442379f19bdae8c560d9879ee291560a7cd2e1c
-[`a9a930d`]: https://github.com/linkulabs/rtd-rust-sdk/commit/a9a930d9f8afbfc025f8978e317025798d225790
-[`5e11579`]: https://github.com/linkulabs/rtd-rust-sdk/commit/5e11579031793f086178332219f5847ec94da0c4
+[`2442379`]: https://github.com/linkuverse/rtd-rust-sdk/commit/2442379f19bdae8c560d9879ee291560a7cd2e1c
+[`a9a930d`]: https://github.com/linkuverse/rtd-rust-sdk/commit/a9a930d9f8afbfc025f8978e317025798d225790
+[`5e11579`]: https://github.com/linkuverse/rtd-rust-sdk/commit/5e11579031793f086178332219f5847ec94da0c4
 [#87]: https://github.com/LinkUVerse/rtd-rust-sdk/pull/87
 
 # [0.0.2] - 2025-01-06
@@ -136,25 +316,32 @@
 - Removed the `unresolved` module and moved it to the `rtd-transaction-builder` crate ([`d965897`])
 - Removed the `schemars` feature ([`bc6dd37`])
 
-[`c5a25ce`]: https://github.com/linkulabs/rtd-rust-sdk/commit/c5a25ce356a8cbe42ddcc6ec6bab380007790b44
-[`6918fd8`]: https://github.com/linkulabs/rtd-rust-sdk/commit/6918fd88d40734b8c15fb5c519e9a40aec53eb74
-[#77]: https://github.com/linkulabs/rtd-rust-sdk/pull/77
-[`d965897`]: https://github.com/linkulabs/rtd-rust-sdk/commit/d9658978a4c6e928d036fbedaab9326d5e28de87
-[`dc54c46`]: https://github.com/linkulabs/rtd-rust-sdk/commit/dc54c469f9d006f02d82ec5781d73e8e09ae26ae
-[`aa546ca`]: https://github.com/linkulabs/rtd-rust-sdk/commit/aa546ca91249932da3f8e3d55ba6e52e40cd8929
-[`bc6dd37`]: https://github.com/linkulabs/rtd-rust-sdk/commit/bc6dd3732973ed3c1c3ae811a818fc8504a99f0b
+[`c5a25ce`]: https://github.com/linkuverse/rtd-rust-sdk/commit/c5a25ce356a8cbe42ddcc6ec6bab380007790b44
+[`6918fd8`]: https://github.com/linkuverse/rtd-rust-sdk/commit/6918fd88d40734b8c15fb5c519e9a40aec53eb74
+[#77]: https://github.com/linkuverse/rtd-rust-sdk/pull/77
+[`d965897`]: https://github.com/linkuverse/rtd-rust-sdk/commit/d9658978a4c6e928d036fbedaab9326d5e28de87
+[`dc54c46`]: https://github.com/linkuverse/rtd-rust-sdk/commit/dc54c469f9d006f02d82ec5781d73e8e09ae26ae
+[`aa546ca`]: https://github.com/linkuverse/rtd-rust-sdk/commit/aa546ca91249932da3f8e3d55ba6e52e40cd8929
+[`bc6dd37`]: https://github.com/linkuverse/rtd-rust-sdk/commit/bc6dd3732973ed3c1c3ae811a818fc8504a99f0b
 
 # [0.0.1] - 2024-09-25
 
 Initial release
 
-[0.1.1]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.1.1
-[0.1.0]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.1.0
-[0.0.8]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.8
-[0.0.7]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.7
-[0.0.6]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.6
-[0.0.5]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.5
-[0.0.4]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.4
-[0.0.3]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.3
-[0.0.2]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.2
-[0.0.1]: https://github.com/linkulabs/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.1
+[0.4.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.4.0
+[0.3.2]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.3.2
+[0.3.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.3.1
+[0.3.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.3.0
+[0.2.2]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.2.2
+[0.2.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.2.1
+[0.2.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.2.0
+[0.1.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.1.1
+[0.1.0]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.1.0
+[0.0.8]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.8
+[0.0.7]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.7
+[0.0.6]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.6
+[0.0.5]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.5
+[0.0.4]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.4
+[0.0.3]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.3
+[0.0.2]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.2
+[0.0.1]: https://github.com/linkuverse/rtd-rust-sdk/releases/tag/rtd-sdk-types-0.0.1

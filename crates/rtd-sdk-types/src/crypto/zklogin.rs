@@ -195,106 +195,17 @@ impl std::error::Error for InvalidZkLoginAuthenticatorError {}
 #[cfg(feature = "serde")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "serde")))]
 impl ZkLoginClaim {
+    /// Base64-decode `value` at its `index_mod_4` offset within the JWT payload, yielding
+    /// the decoded extended claim string (e.g. `"iss":"https://accounts.google.com",`).
+    pub fn decoded_extended_claim(&self) -> Result<String, InvalidZkLoginAuthenticatorError> {
+        decode_base64_url(&self.value, &self.index_mod_4)
+    }
+
     fn verify_extended_claim(
         &self,
         expected_key: &str,
     ) -> Result<String, InvalidZkLoginAuthenticatorError> {
-        /// Map a base64 string to a bit array by taking each char's index and convert it to binary form with one bit per u8
-        /// element in the output. Returns InvalidZkLoginClaimError if one of the characters is not in the base64 charset.
-        fn base64_to_bitarray(input: &str) -> Result<Vec<u8>, InvalidZkLoginAuthenticatorError> {
-            use itertools::Itertools;
-
-            const BASE64_URL_CHARSET: &str =
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-            input
-                .chars()
-                .map(|c| {
-                    BASE64_URL_CHARSET
-                        .find(c)
-                        .map(|index| index as u8)
-                        .map(|index| (0..6).rev().map(move |i| (index >> i) & 1))
-                        .ok_or_else(|| {
-                            InvalidZkLoginAuthenticatorError::new("base64_to_bitarry invalid input")
-                        })
-                })
-                .flatten_ok()
-                .collect()
-        }
-
-        /// Convert a bitarray (each bit is represented by a u8) to a byte array by taking each 8 bits as a
-        /// byte in big-endian format.
-        fn bitarray_to_bytearray(bits: &[u8]) -> Result<Vec<u8>, InvalidZkLoginAuthenticatorError> {
-            #[expect(clippy::manual_is_multiple_of)]
-            if bits.len() % 8 != 0 {
-                return Err(InvalidZkLoginAuthenticatorError::new(
-                    "bitarray_to_bytearray invalid input",
-                ));
-            }
-            Ok(bits
-                .chunks(8)
-                .map(|chunk| {
-                    let mut byte = 0u8;
-                    for (i, bit) in chunk.iter().rev().enumerate() {
-                        byte |= bit << i;
-                    }
-                    byte
-                })
-                .collect())
-        }
-
-        /// Parse the base64 string, add paddings based on offset, and convert to a bytearray.
-        fn decode_base64_url(
-            s: &str,
-            index_mod_4: &u8,
-        ) -> Result<String, InvalidZkLoginAuthenticatorError> {
-            if s.len() < 2 {
-                return Err(InvalidZkLoginAuthenticatorError::new(
-                    "Base64 string smaller than 2",
-                ));
-            }
-            let mut bits = base64_to_bitarray(s)?;
-            match index_mod_4 {
-                0 => {}
-                1 => {
-                    bits.drain(..2);
-                }
-                2 => {
-                    bits.drain(..4);
-                }
-                _ => {
-                    return Err(InvalidZkLoginAuthenticatorError::new(
-                        "Invalid first_char_offset",
-                    ));
-                }
-            }
-
-            let last_char_offset = (index_mod_4 + s.len() as u8 - 1) % 4;
-            match last_char_offset {
-                3 => {}
-                2 => {
-                    bits.drain(bits.len() - 2..);
-                }
-                1 => {
-                    bits.drain(bits.len() - 4..);
-                }
-                _ => {
-                    return Err(InvalidZkLoginAuthenticatorError::new(
-                        "Invalid last_char_offset",
-                    ));
-                }
-            }
-
-            if bits.len() % 8 != 0 {
-                return Err(InvalidZkLoginAuthenticatorError::new("Invalid bits length"));
-            }
-
-            Ok(std::str::from_utf8(&bitarray_to_bytearray(&bits)?)
-                .map_err(|_| InvalidZkLoginAuthenticatorError::new("Invalid UTF8 string"))?
-                .to_owned())
-        }
-
-        let extended_claim = decode_base64_url(&self.value, &self.index_mod_4)?;
+        let extended_claim = self.decoded_extended_claim()?;
 
         // Last character of each extracted_claim must be '}' or ','
         if !(extended_claim.ends_with('}') || extended_claim.ends_with(',')) {
@@ -316,6 +227,109 @@ impl ZkLoginClaim {
             })
             .ok_or_else(|| InvalidZkLoginAuthenticatorError::new("invalid extended claim"))
     }
+}
+
+#[cfg(feature = "serde")]
+/// Map a base64 string to a bit array by taking each char's index and convert it to binary form with one bit per u8
+/// element in the output. Returns InvalidZkLoginClaimError if one of the characters is not in the base64 charset.
+fn base64_to_bitarray(input: &str) -> Result<Vec<u8>, InvalidZkLoginAuthenticatorError> {
+    use itertools::Itertools;
+
+    const BASE64_URL_CHARSET: &str =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+    input
+        .chars()
+        .map(|c| {
+            BASE64_URL_CHARSET
+                .find(c)
+                .map(|index| index as u8)
+                .map(|index| (0..6).rev().map(move |i| (index >> i) & 1))
+                .ok_or_else(|| {
+                    InvalidZkLoginAuthenticatorError::new("base64_to_bitarry invalid input")
+                })
+        })
+        .flatten_ok()
+        .collect()
+}
+
+#[cfg(feature = "serde")]
+/// Convert a bitarray (each bit is represented by a u8) to a byte array by taking each 8 bits as a
+/// byte in big-endian format.
+fn bitarray_to_bytearray(bits: &[u8]) -> Result<Vec<u8>, InvalidZkLoginAuthenticatorError> {
+    #[expect(clippy::manual_is_multiple_of)]
+    if bits.len() % 8 != 0 {
+        return Err(InvalidZkLoginAuthenticatorError::new(
+            "bitarray_to_bytearray invalid input",
+        ));
+    }
+    Ok(bits
+        .chunks(8)
+        .map(|chunk| {
+            let mut byte = 0u8;
+            for (i, bit) in chunk.iter().rev().enumerate() {
+                byte |= bit << i;
+            }
+            byte
+        })
+        .collect())
+}
+
+#[cfg(feature = "serde")]
+/// Parse the base64 string, add paddings based on offset, and convert to a bytearray.
+fn decode_base64_url(
+    s: &str,
+    index_mod_4: &u8,
+) -> Result<String, InvalidZkLoginAuthenticatorError> {
+    if s.len() < 2 {
+        return Err(InvalidZkLoginAuthenticatorError::new(
+            "Base64 string smaller than 2",
+        ));
+    }
+    let mut bits = base64_to_bitarray(s)?;
+    match index_mod_4 {
+        0 => {}
+        1 => {
+            bits.drain(..2);
+        }
+        2 => {
+            bits.drain(..4);
+        }
+        _ => {
+            return Err(InvalidZkLoginAuthenticatorError::new(
+                "Invalid first_char_offset",
+            ));
+        }
+    }
+
+    // Compute the offset in `usize` so that an `s.len()` past
+    // `u8::MAX` cannot wrap to a small value (or underflow when
+    // combined with the `- 1`). The earlier match has already
+    // narrowed `*index_mod_4` to `0..=2`, and `s.len() >= 2`,
+    // so the unsigned subtraction never underflows here.
+    let last_char_offset = (*index_mod_4 as usize + s.len() - 1) % 4;
+    match last_char_offset {
+        3 => {}
+        2 => {
+            bits.drain(bits.len() - 2..);
+        }
+        1 => {
+            bits.drain(bits.len() - 4..);
+        }
+        _ => {
+            return Err(InvalidZkLoginAuthenticatorError::new(
+                "Invalid last_char_offset",
+            ));
+        }
+    }
+
+    if bits.len() % 8 != 0 {
+        return Err(InvalidZkLoginAuthenticatorError::new("Invalid bits length"));
+    }
+
+    Ok(std::str::from_utf8(&bitarray_to_bytearray(&bits)?)
+        .map_err(|_| InvalidZkLoginAuthenticatorError::new("Invalid UTF8 string"))?
+        .to_owned())
 }
 
 /// Struct that represents a standard JWT header according to
@@ -592,7 +606,7 @@ impl std::fmt::Display for Bn254FieldElement {
 }
 
 #[derive(Debug)]
-pub struct Bn254FieldElementParseError(bnum::errors::ParseIntError);
+pub struct Bn254FieldElementParseError(crate::U256ParseError);
 
 impl std::fmt::Display for Bn254FieldElementParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -656,6 +670,51 @@ mod test {
         assert_eq!(radix10, seed.to_string());
         // Ensure unpadded doesn't crash
         seed.unpadded();
+    }
+
+    // Regression test: BCS deserialization used to call
+    // `DisplayFromStr::deserialize_as` directly, which accepts any
+    // radix10 string `bnum::U256::from_str_radix` would parse —
+    // including encodings with leading zeros like `"007"`. Two
+    // distinct BCS byte strings (`0x01 0x37` and `0x03 0x30 0x30 0x37`)
+    // therefore decoded to the same `Bn254FieldElement`, breaking the
+    // canonicality invariant that downstream signature deduplication
+    // and digesting rely on. The deserializer must now reject any
+    // encoding that does not round-trip through `Display`.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn bcs_rejects_non_canonical_radix10_encoding() {
+        let canonical = bcs::to_bytes("7").unwrap();
+        let leading_zero = bcs::to_bytes("007").unwrap();
+        assert_ne!(canonical, leading_zero);
+
+        let parsed: Bn254FieldElement = bcs::from_bytes(&canonical).unwrap();
+        assert_eq!(parsed.to_string(), "7");
+
+        let err = bcs::from_bytes::<Bn254FieldElement>(&leading_zero).unwrap_err();
+        assert!(
+            err.to_string().contains("non-canonical"),
+            "unexpected error: {err}"
+        );
+    }
+
+    // Regression test: `decode_base64_url` used to compute
+    // `(index_mod_4 + s.len() as u8 - 1) % 4` in `u8`. With an
+    // attacker-supplied JWT claim value of length 256 the cast
+    // truncates `s.len()` to `0` and the subtraction underflows,
+    // panicking under `debug_assertions`. The arithmetic must now use
+    // `usize` so that the function returns a structured error rather
+    // than crashing the caller.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn long_claim_value_does_not_panic_on_u8_overflow() {
+        use super::ZkLoginClaim;
+
+        let claim = ZkLoginClaim {
+            value: "A".repeat(256),
+            index_mod_4: 0,
+        };
+        assert!(claim.verify_extended_claim("iss").is_err());
     }
 }
 
@@ -909,7 +968,27 @@ mod serialization {
         where
             D: Deserializer<'de>,
         {
-            serde_with::DisplayFromStr::deserialize_as(deserializer)
+            // `Display` strips any leading zeros from the radix10
+            // encoding while `FromStr` (via `bnum::U256::from_str_radix`)
+            // accepts them, so the bare `DisplayFromStr` round-trip is
+            // not canonical: the BCS encodings of e.g. `"7"` and
+            // `"007"` both parse to the same value but differ at the
+            // byte level. Any consumer that keys signature dedup,
+            // replay protection, or content digesting on the BCS
+            // bytes of a `ZkLoginAuthenticator` (which embeds ten
+            // `Bn254FieldElement`s) would treat such pairs as
+            // distinct, so reject any encoding whose `Display`
+            // round-trip differs from the input.
+            let s: std::borrow::Cow<'de, str> = Deserialize::deserialize(deserializer)?;
+            let value = s
+                .parse::<Bn254FieldElement>()
+                .map_err(serde::de::Error::custom)?;
+            if value.to_string() != *s {
+                return Err(serde::de::Error::custom(
+                    "non-canonical Bn254FieldElement encoding",
+                ));
+            }
+            Ok(value)
         }
     }
 
