@@ -6,20 +6,20 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
-use sui_crypto::SuiSigner;
-use sui_crypto::ed25519::Ed25519PrivateKey;
-use sui_rpc::Client;
-use sui_rpc::field::FieldMask;
-use sui_rpc::field::FieldMaskUtil;
-use sui_rpc::proto::sui::rpc::v2::ExecuteTransactionRequest;
-use sui_sdk_types::Address;
-use sui_sdk_types::Digest;
-use sui_sdk_types::Identifier;
-use sui_sdk_types::SignatureScheme;
-use sui_transaction_builder::Function;
-use sui_transaction_builder::ObjectInput;
-use sui_transaction_builder::TransactionBuilder;
-use sui_transaction_builder::intent::CoinWithBalance;
+use rtd_crypto::SuiSigner;
+use rtd_crypto::ed25519::Ed25519PrivateKey;
+use rtd_rpc::Client;
+use rtd_rpc::field::FieldMask;
+use rtd_rpc::field::FieldMaskUtil;
+use rtd_rpc::proto::rtd::rpc::v2::ExecuteTransactionRequest;
+use rtd_sdk_types::Address;
+use rtd_sdk_types::Digest;
+use rtd_sdk_types::Identifier;
+use rtd_sdk_types::SignatureScheme;
+use rtd_transaction_builder::Function;
+use rtd_transaction_builder::ObjectInput;
+use rtd_transaction_builder::TransactionBuilder;
+use rtd_transaction_builder::intent::CoinWithBalance;
 use tempfile::TempDir;
 use tokio::time::Duration;
 use tokio::time::sleep;
@@ -29,15 +29,15 @@ const DEFAULT_EPOCH_DURATION_MS: u64 = 60_000;
 const NETWORK_STARTUP_TIMEOUT_SECS: u64 = 30;
 const NETWORK_STARTUP_POLL_INTERVAL_SECS: u64 = 1;
 
-fn sui_binary() -> &'static Path {
-    static SUI_BINARY: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+fn rtd_binary() -> &'static Path {
+    static RTD_BINARY: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-    SUI_BINARY
+    RTD_BINARY
         .get_or_init(|| {
-            if let Ok(path) = std::env::var("SUI_BINARY") {
+            if let Ok(path) = std::env::var("RTD_BINARY") {
                 return PathBuf::from(path);
             }
-            if let Ok(output) = Command::new("which").arg("sui").output()
+            if let Ok(output) = Command::new("which").arg("rtd").output()
                 && output.status.success()
             {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -45,7 +45,7 @@ fn sui_binary() -> &'static Path {
                     return PathBuf::from(path);
                 }
             }
-            panic!("sui binary not found. Please install sui or set SUI_BINARY env var")
+            panic!("rtd binary not found. Please install rtd or set RTD_BINARY env var")
         })
         .as_path()
 }
@@ -55,7 +55,7 @@ async fn wait_for_ready(client: &mut Client) -> Result<()> {
     for _ in 0..NETWORK_STARTUP_TIMEOUT_SECS {
         if let Ok(resp) = client
             .ledger_client()
-            .get_service_info(sui_rpc::proto::sui::rpc::v2::GetServiceInfoRequest::default())
+            .get_service_info(rtd_rpc::proto::rtd::rpc::v2::GetServiceInfoRequest::default())
             .await
             && resp.into_inner().checkpoint_height() > 5
         {
@@ -69,9 +69,9 @@ async fn wait_for_ready(client: &mut Client) -> Result<()> {
     )
 }
 
-/// Handle for a Sui network running via pre-compiled binary
+/// Handle for a Rtd network running via pre-compiled binary
 pub struct SuiNetworkHandle {
-    /// Child process running sui
+    /// Child process running rtd
     process: Child,
 
     /// Temporary directory for config (auto-cleanup on drop)
@@ -99,7 +99,7 @@ pub struct SuiNetworkBuilder {
     // pub dir: Option<PathBuf>,
     pub num_validators: usize,
     pub epoch_duration_ms: u64,
-    pub sui_binary_path: Option<PathBuf>, // Optional custom binary
+    pub rtd_binary_path: Option<PathBuf>, // Optional custom binary
 }
 
 impl Default for SuiNetworkBuilder {
@@ -107,7 +107,7 @@ impl Default for SuiNetworkBuilder {
         Self {
             num_validators: DEFAULT_NUM_VALIDATORS,
             epoch_duration_ms: DEFAULT_EPOCH_DURATION_MS,
-            sui_binary_path: None,
+            rtd_binary_path: None,
             // dir: None,
         }
     }
@@ -125,7 +125,7 @@ impl SuiNetworkBuilder {
     }
 
     pub fn with_binary(mut self, path: PathBuf) -> Self {
-        self.sui_binary_path = Some(path);
+        self.rtd_binary_path = Some(path);
         self
     }
 
@@ -144,9 +144,9 @@ impl SuiNetworkBuilder {
 
         let rpc_url = format!("http://127.0.0.1:{rpc_port}");
 
-        let mut client = sui_rpc::Client::new(&rpc_url)?;
+        let mut client = rtd_rpc::Client::new(&rpc_url)?;
         wait_for_ready(&mut client).await?;
-        let mut sui = SuiNetworkHandle {
+        let mut rtd = SuiNetworkHandle {
             process,
             dir,
             rpc_url,
@@ -158,23 +158,23 @@ impl SuiNetworkBuilder {
         };
 
         // Make sure SuiSystemState has been upgraded to v2
-        sui.upgrade_sui_system_state().await?;
+        rtd.upgrade_sui_system_state().await?;
 
         // Make sure validator accounts are funded
-        let fund_requests = sui
+        let fund_requests = rtd
             .validator_keys
             .keys()
-            // give each validator 1M SUI
+            // give each validator 1M RTD
             .map(|address| (*address, 1_000_000 * 1_000_000_000))
             .collect::<Vec<_>>();
-        sui.fund(&fund_requests).await?;
+        rtd.fund(&fund_requests).await?;
 
-        Ok(sui)
+        Ok(rtd)
     }
 
     fn generate_genesis(&self, dir: &Path) -> Result<()> {
         std::fs::create_dir_all(dir)?;
-        let mut cmd = Command::new(sui_binary());
+        let mut cmd = Command::new(rtd_binary());
         cmd.arg("genesis")
             .arg("--working-dir")
             .arg(dir)
@@ -196,7 +196,7 @@ impl SuiNetworkBuilder {
         let stderr_name = dir.join("out.stderr");
         let stderr = std::fs::File::create(stderr_name)?;
 
-        let mut cmd = Command::new(sui_binary());
+        let mut cmd = Command::new(rtd_binary());
 
         cmd.arg("start")
             .arg("--network.config")
@@ -206,7 +206,7 @@ impl SuiNetworkBuilder {
             .stdout(stdout)
             .stderr(stderr)
             .spawn()
-            .map_err(|e| anyhow!("Failed to run `sui start`: {e}"))
+            .map_err(|e| anyhow!("Failed to run `rtd start`: {e}"))
     }
 }
 
@@ -284,7 +284,7 @@ impl SuiNetworkHandle {
 
         for (address, amount) in requests {
             let recipient = builder.pure(address);
-            let coin = builder.intent(CoinWithBalance::sui(*amount));
+            let coin = builder.intent(CoinWithBalance::rtd(*amount));
             builder.transfer_objects(vec![coin], recipient);
         }
 
@@ -316,14 +316,14 @@ impl SuiNetworkHandle {
 
         let mut builder = TransactionBuilder::new();
         builder.set_sender(sender);
-        let sui_system = builder.object(ObjectInput::new(Address::from_static("0x5")));
+        let rtd_system = builder.object(ObjectInput::new(Address::from_static("0x5")));
         builder.move_call(
             Function::new(
                 Address::from_static("0x3"),
-                Identifier::from_static("sui_system"),
+                Identifier::from_static("rtd_system"),
                 Identifier::from_static("active_validator_addresses"),
             ),
-            vec![sui_system],
+            vec![rtd_system],
         );
 
         let transaction = builder.build(&mut self.client).await?;
@@ -348,7 +348,7 @@ impl SuiNetworkHandle {
         Ok(())
     }
 
-    /// Deposit SUI into the recipient's Address Balance using `0x2::coin::send_funds`.
+    /// Deposit RTD into the recipient's Address Balance using `0x2::coin::send_funds`.
     pub async fn deposit_to_address_balance(
         &mut self,
         recipient: Address,
@@ -360,7 +360,7 @@ impl SuiNetworkHandle {
         let mut builder = TransactionBuilder::new();
         builder.set_sender(sender);
 
-        let coin = builder.intent(CoinWithBalance::sui(amount));
+        let coin = builder.intent(CoinWithBalance::rtd(amount));
         let recipient_arg = builder.pure(&recipient);
         builder.move_call(
             Function::new(
@@ -368,7 +368,7 @@ impl SuiNetworkHandle {
                 Identifier::from_static("coin"),
                 Identifier::from_static("send_funds"),
             )
-            .with_type_args(vec![sui_sdk_types::StructTag::sui().into()]),
+            .with_type_args(vec![rtd_sdk_types::StructTag::rtd().into()]),
             vec![coin, recipient_arg],
         );
 
@@ -394,7 +394,7 @@ impl SuiNetworkHandle {
         Ok(())
     }
 
-    pub fn build_package(&self, package: &Path) -> Result<(sui_sdk_types::Publish, Digest)> {
+    pub fn build_package(&self, package: &Path) -> Result<(rtd_sdk_types::Publish, Digest)> {
         #[derive(serde_derive::Deserialize)]
         struct MoveBuildOutput {
             modules: Vec<String>,
@@ -403,7 +403,7 @@ impl SuiNetworkHandle {
         }
         let client_config = self.dir.path().join("client.yaml");
 
-        let mut cmd = Command::new(sui_binary());
+        let mut cmd = Command::new(rtd_binary());
         cmd.arg("move")
             .arg("--client.config")
             .arg(client_config)
@@ -431,7 +431,7 @@ impl SuiNetworkHandle {
         let digest = Digest::from_bytes(move_build_output.digest)?;
 
         Ok((
-            sui_sdk_types::Publish {
+            rtd_sdk_types::Publish {
                 modules,
                 dependencies: move_build_output.dependencies,
             },
@@ -476,18 +476,18 @@ fn get_ephemeral_port() -> std::io::Result<u16> {
 #[cfg(test)]
 mod tests {
     use futures::stream::StreamExt;
-    use sui_rpc::field::FieldMask;
-    use sui_rpc::field::FieldMaskUtil;
-    use sui_rpc::proto::sui::rpc::v2::SubscribeCheckpointsRequest;
+    use rtd_rpc::field::FieldMask;
+    use rtd_rpc::field::FieldMaskUtil;
+    use rtd_rpc::proto::rtd::rpc::v2::SubscribeCheckpointsRequest;
 
     use super::*;
 
     #[tokio::test]
     async fn it_works() -> Result<(), anyhow::Error> {
-        let mut sui = SuiNetworkBuilder::default().build().await?;
+        let mut rtd = SuiNetworkBuilder::default().build().await?;
 
         // stream ~10 checkpoints to make sure things work
-        let mut stream = sui
+        let mut stream = rtd
             .client
             .subscription_client()
             .subscribe_checkpoints(

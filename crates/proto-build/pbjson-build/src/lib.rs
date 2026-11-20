@@ -206,7 +206,7 @@ impl Builder {
 
     /// Set the module path prefix for serde helper types.
     ///
-    /// Defaults to `crate::_serde`. Set to e.g. `sui_rpc::_serde` when generating
+    /// Defaults to `crate::_serde`. Set to e.g. `rtd_rpc::_serde` when generating
     /// code that lives in a different crate from the `_serde` helpers module.
     pub fn serde_path(&mut self, path: impl Into<String>) -> &mut Self {
         self.serde_path = Some(path.into());

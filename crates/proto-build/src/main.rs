@@ -11,12 +11,12 @@ use proto_build::message_graph::DescriptorGraph;
 fn main() {
     let root_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"));
     let vendored_proto_dir = root_dir
-        .join("../sui-rpc/vendored/proto")
+        .join("../rtd-rpc/vendored/proto")
         .canonicalize()
         .unwrap();
-    let local_proto_dir = root_dir.join("../sui-rpc/proto").canonicalize().unwrap();
+    let local_proto_dir = root_dir.join("../rtd-rpc/proto").canonicalize().unwrap();
     let out_dir = root_dir
-        .join("../sui-rpc/src/proto/generated")
+        .join("../rtd-rpc/src/proto/generated")
         .canonicalize()
         .unwrap();
 
@@ -62,22 +62,22 @@ fn main() {
         .build_client(true)
         .build_server(true)
         .bytes(".")
-        .boxed(".sui.rpc.v2.Input.literal")
-        .boxed(".sui.rpc.v2.Epoch.system_state")
+        .boxed(".rtd.rpc.v2.Input.literal")
+        .boxed(".rtd.rpc.v2.Epoch.system_state")
         .boxed("json")
-        .boxed(".sui.rpc.v2.Object.display")
-        .message_attribute(".sui.rpc", "#[non_exhaustive]")
-        .enum_attribute(".sui.rpc", "#[non_exhaustive]")
+        .boxed(".rtd.rpc.v2.Object.display")
+        .message_attribute(".rtd.rpc", "#[non_exhaustive]")
+        .enum_attribute(".rtd.rpc", "#[non_exhaustive]")
         // prost-build refuses to derive Eq and Hash for any message with a
         // repeated message-typed field, even when the element type is
         // eligible, and its eligibility computation ignores manually added
         // derives. SubscribeCheckpointsRequest derived both traits before it
         // gained the filter field, so derive them explicitly (along with the
         // filter types its derives depend on) to keep its API compatible.
-        .type_attribute(".sui.rpc.v2.TransactionFilter", "#[derive(Eq, Hash)]")
-        .type_attribute(".sui.rpc.v2.TransactionTerm", "#[derive(Eq, Hash)]")
+        .type_attribute(".rtd.rpc.v2.TransactionFilter", "#[derive(Eq, Hash)]")
+        .type_attribute(".rtd.rpc.v2.TransactionTerm", "#[derive(Eq, Hash)]")
         .type_attribute(
-            ".sui.rpc.v2.SubscribeCheckpointsRequest",
+            ".rtd.rpc.v2.SubscribeCheckpointsRequest",
             "#[derive(Eq, Hash)]",
         )
         .btree_map(".")
@@ -119,7 +119,7 @@ fn main() {
         .out_dir(&out_dir)
         .ignore_unknown_fields()
         .btree_map(["."])
-        .build(&[".google.rpc", ".sui"])
+        .build(&[".google.rpc", ".rtd"])
         .unwrap();
 
     for (package, fds) in packages {
