@@ -7,7 +7,7 @@ use rtd_sdk_types::SimpleSignature;
 use rtd_sdk_types::ZkLoginAuthenticator;
 use rtd_sdk_types::ZkLoginInputs;
 
-use crate::SuiVerifier;
+use crate::RtdVerifier;
 use crate::ed25519::Ed25519PrivateKey;
 
 use super::*;

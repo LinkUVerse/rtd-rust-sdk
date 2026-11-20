@@ -86,7 +86,7 @@ impl ObjectReference {
         // `accumulator::Key<balance::Balance<RTD>>`.
         let accumulator_root = const { Address::from_static("0xacc") };
 
-        let balance_sui_type = StructTag::new(
+        let balance_rtd_type = StructTag::new(
             Address::TWO,
             Identifier::from_static("balance"),
             Identifier::from_static("Balance"),
@@ -96,7 +96,7 @@ impl ObjectReference {
             Address::TWO,
             Identifier::from_static("accumulator"),
             Identifier::from_static("Key"),
-            vec![balance_sui_type.into()],
+            vec![balance_rtd_type.into()],
         )
         .into();
 
@@ -615,13 +615,13 @@ mod serialization {
         Other(StructTag),
         /// A RTD coin (i.e., `0x2::coin::Coin<0x2::rtd::RTD>`)
         GasCoin,
-        /// A record of a staked RTD coin (i.e., `0x3::staking_pool::StakedSui`)
-        StakedSui,
+        /// A record of a staked RTD coin (i.e., `0x3::staking_pool::StakedRtd`)
+        StakedRtd,
         /// A non-RTD coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::rtd::RTD`)
         Coin(TypeTag),
         /// A RTD balance accumulator field
         /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<0x2::rtd::RTD>>, 0x2::accumulator::U128>`)
-        SuiBalanceAccumulatorField,
+        RtdBalanceAccumulatorField,
         /// A non-RTD balance accumulator field
         /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<T>>, 0x2::accumulator::U128>`
         /// where T != 0x2::rtd::RTD)
@@ -635,13 +635,13 @@ mod serialization {
         Other(&'a StructTag),
         /// A RTD coin (i.e., `0x2::coin::Coin<0x2::rtd::RTD>`)
         GasCoin,
-        /// A record of a staked RTD coin (i.e., `0x3::staking_pool::StakedSui`)
-        StakedSui,
+        /// A record of a staked RTD coin (i.e., `0x3::staking_pool::StakedRtd`)
+        StakedRtd,
         /// A non-RTD coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::rtd::RTD`)
         Coin(&'a TypeTag),
         /// A RTD balance accumulator field
         /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<0x2::rtd::RTD>>, 0x2::accumulator::U128>`)
-        SuiBalanceAccumulatorField,
+        RtdBalanceAccumulatorField,
         /// A non-RTD balance accumulator field
         /// (i.e., `0x2::dynamic_field::Field<0x2::accumulator::Key<0x2::balance::Balance<T>>, 0x2::accumulator::U128>`
         /// where T != 0x2::rtd::RTD)
@@ -653,9 +653,9 @@ mod serialization {
             match self {
                 MoveStructType::Other(tag) => tag,
                 MoveStructType::GasCoin => StructTag::gas_coin(),
-                MoveStructType::StakedSui => StructTag::staked_sui(),
+                MoveStructType::StakedRtd => StructTag::staked_rtd(),
                 MoveStructType::Coin(type_tag) => StructTag::coin(type_tag),
-                MoveStructType::SuiBalanceAccumulatorField => {
+                MoveStructType::RtdBalanceAccumulatorField => {
                     StructTag::balance_accumulator_field(StructTag::rtd().into())
                 }
                 MoveStructType::BalanceAccumulatorField(type_tag) => {
@@ -671,9 +671,9 @@ mod serialization {
             match self {
                 Self::Other(_) => 0,
                 Self::GasCoin => 1,
-                Self::StakedSui => 2,
+                Self::StakedRtd => 2,
                 Self::Coin(_) => 3,
-                Self::SuiBalanceAccumulatorField => 4,
+                Self::RtdBalanceAccumulatorField => 4,
                 Self::BalanceAccumulatorField(_) => 5,
             }
         }
@@ -696,15 +696,15 @@ mod serialization {
                 }
             } else if address == &Address::THREE
                 && module == "staking_pool"
-                && name == "StakedSui"
+                && name == "StakedRtd"
                 && type_params.is_empty()
             {
-                Self::StakedSui
+                Self::StakedRtd
             } else if let Some(coin_type) = s.is_balance_accumulator_field() {
                 if let TypeTag::Struct(s_inner) = coin_type
                     && s_inner.is_gas()
                 {
-                    Self::SuiBalanceAccumulatorField
+                    Self::RtdBalanceAccumulatorField
                 } else {
                     Self::BalanceAccumulatorField(coin_type)
                 }
@@ -717,9 +717,9 @@ mod serialization {
             match self {
                 Self::Other(_) => 0,
                 Self::GasCoin => 1,
-                Self::StakedSui => 2,
+                Self::StakedRtd => 2,
                 Self::Coin(_) => 3,
-                Self::SuiBalanceAccumulatorField => 4,
+                Self::RtdBalanceAccumulatorField => 4,
                 Self::BalanceAccumulatorField(_) => 5,
             }
         }
@@ -961,12 +961,12 @@ mod serialization {
         // address balances
         #[test]
         fn address_balance_objects() {
-            let non_sui_address_balance_type = "AAUHIRSU0QWQjjOQW/wFv4O24+PddAa8JQ45YwhB+i7EfzgGY29pbl9hBkNPSU5fQQAAEAAAAAAAAABQCSgWThHEQ1NqPKQQsXVKd/yFD0FSDYUtrvXx1xt+jIk0Bsyk3bbd4hLE1MDxwok6jzp0k3365HVXhJgmi+4vjcQJAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACswgmPj1SN1ZkPLtiVtVs0XD3QCgS/YYUFBh9Q6p4b+zoJAAAAAAAAAAAA==";
+            let non_rtd_address_balance_type = "AAUHIRSU0QWQjjOQW/wFv4O24+PddAa8JQ45YwhB+i7EfzgGY29pbl9hBkNPSU5fQQAAEAAAAAAAAABQCSgWThHEQ1NqPKQQsXVKd/yFD0FSDYUtrvXx1xt+jIk0Bsyk3bbd4hLE1MDxwok6jzp0k3365HVXhJgmi+4vjcQJAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACswgmPj1SN1ZkPLtiVtVs0XD3QCgS/YYUFBh9Q6p4b+zoJAAAAAAAAAAAA==";
 
-            let non_sui = Object::from_bcs_base64(non_sui_address_balance_type).unwrap();
+            let non_rtd = Object::from_bcs_base64(non_rtd_address_balance_type).unwrap();
             assert_eq!(
-                non_sui.to_bcs_base64().unwrap(),
-                non_sui_address_balance_type
+                non_rtd.to_bcs_base64().unwrap(),
+                non_rtd_address_balance_type
             );
 
             let rtd_address_balance_type = "AAQAAgAAAAAAAABQlJ321C1hKFc15SQmGZUdTDrwVh7xQ46GoV2zEnFK88b/JOPl1wGyhHd/R1itnNXhAzGoyXuDHuOL3V34auvxf+gDAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACswgjRbaObiwu6bn07xewfd3V9iFJfbhcaWy7K6YgNsZdKkAAAAAAAAAAA==";
@@ -1067,10 +1067,10 @@ mod serialization {
                     [&[0u8][..], &bcs::to_bytes(&StructTag::gas_coin()).unwrap()].concat(),
                 ),
                 (
-                    "Other(StakedSui tag)",
+                    "Other(StakedRtd tag)",
                     [
                         &[0u8][..],
-                        &bcs::to_bytes(&StructTag::staked_sui()).unwrap(),
+                        &bcs::to_bytes(&StructTag::staked_rtd()).unwrap(),
                     ]
                     .concat(),
                 ),
@@ -1083,7 +1083,7 @@ mod serialization {
                     .concat(),
                 ),
                 (
-                    "Other(SuiBalanceAccumulatorField tag)",
+                    "Other(RtdBalanceAccumulatorField tag)",
                     [
                         &[0u8][..],
                         &bcs::to_bytes(&StructTag::balance_accumulator_field(

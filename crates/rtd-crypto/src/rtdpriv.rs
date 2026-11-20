@@ -7,14 +7,14 @@
 //! crate:
 //!
 //! - `bech32`: a Bech32 (BIP-173) string with the human-readable part
-//!   `suiprivkey`, produced by `rtd keytool generate` and `rtd keytool
+//!   `rtdprivkey`, produced by `rtd keytool generate` and `rtd keytool
 //!   export`.
 //! - `base64`: a plain Base64 string, the legacy encoding used for entries
 //!   of the Rtd CLI's `rtd.keystore` file and by older versions of `rtd
 //!   keytool`.
 //!
 //! These helpers are kept `pub(crate)` on purpose. Callers reach the formats
-//! through strongly-typed wrappers like `Ed25519PrivateKey::from_suiprivkey`
+//! through strongly-typed wrappers like `Ed25519PrivateKey::from_rtdprivkey`
 //! or `SimpleKeypair::from_base64` to avoid handing raw key bytes back as a
 //! `Vec<u8>` at the public boundary.
 
@@ -45,31 +45,31 @@ fn split_payload(bytes: &[u8]) -> Result<(SignatureScheme, Vec<u8>), SignatureEr
     Ok((scheme, key.to_vec()))
 }
 
-/// The human-readable part of the `suiprivkey` Bech32 encoding.
+/// The human-readable part of the `rtdprivkey` Bech32 encoding.
 #[cfg(feature = "bech32")]
-const HRP: &str = "suiprivkey";
+const HRP: &str = "rtdprivkey";
 
 #[cfg(feature = "bech32")]
 fn hrp() -> bech32::Hrp {
-    // "suiprivkey" is a valid Bech32 HRP (lowercase ASCII, length 10).
-    bech32::Hrp::parse(HRP).expect("`suiprivkey` is a valid Bech32 HRP")
+    // "rtdprivkey" is a valid Bech32 HRP (lowercase ASCII, length 10).
+    bech32::Hrp::parse(HRP).expect("`rtdprivkey` is a valid Bech32 HRP")
 }
 
-/// Encode a `flag || private_key` payload as a Bech32 `suiprivkey` string.
+/// Encode a `flag || private_key` payload as a Bech32 `rtdprivkey` string.
 #[cfg(feature = "bech32")]
 pub(crate) fn encode(scheme: SignatureScheme, key: &[u8]) -> Result<String, SignatureError> {
     bech32::encode::<bech32::Bech32>(hrp(), &join_payload(scheme, key))
         .map_err(|e| SignatureError::from_source(format!("bech32 encode failed: {e}")))
 }
 
-/// Decode a Bech32 `suiprivkey` string into its scheme flag and key bytes.
+/// Decode a Bech32 `rtdprivkey` string into its scheme flag and key bytes.
 ///
 /// The BIP-173 checksum is validated strictly; Bech32m-checksummed strings are
 /// rejected.
 #[cfg(feature = "bech32")]
 pub(crate) fn decode(s: &str) -> Result<(SignatureScheme, Vec<u8>), SignatureError> {
     let parsed = bech32::primitives::decode::CheckedHrpstring::new::<bech32::Bech32>(s)
-        .map_err(|e| SignatureError::from_source(format!("invalid suiprivkey string: {e}")))?;
+        .map_err(|e| SignatureError::from_source(format!("invalid rtdprivkey string: {e}")))?;
 
     if parsed.hrp() != hrp() {
         return Err(SignatureError::from_source(format!(

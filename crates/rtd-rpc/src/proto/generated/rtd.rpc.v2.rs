@@ -1150,7 +1150,7 @@ pub mod execution_error {
         /// The modules in the package must have their self-addresses set to zero.
         PublishErrorNonZeroAddress = 10,
         /// Rtd Move bytecode verification error.
-        SuiMoveVerificationError = 11,
+        RtdMoveVerificationError = 11,
         /// Error from a non-abort instruction.
         /// Possible causes:
         /// Arithmetic error, stack overflow, max value depth, or similar.
@@ -1199,7 +1199,7 @@ pub mod execution_error {
         /// Certificate is on the deny list.
         CertificateDenied = 30,
         /// Rtd Move bytecode verification timed out.
-        SuiMoveVerificationTimedout = 31,
+        RtdMoveVerificationTimedout = 31,
         /// The requested consensus object operation is not allowed.
         ConsensusObjectOperationNotAllowed = 32,
         /// Requested consensus object has been deleted.
@@ -1245,7 +1245,7 @@ pub mod execution_error {
                 Self::InsufficientCoinBalance => "INSUFFICIENT_COIN_BALANCE",
                 Self::CoinBalanceOverflow => "COIN_BALANCE_OVERFLOW",
                 Self::PublishErrorNonZeroAddress => "PUBLISH_ERROR_NON_ZERO_ADDRESS",
-                Self::SuiMoveVerificationError => "RTD_MOVE_VERIFICATION_ERROR",
+                Self::RtdMoveVerificationError => "RTD_MOVE_VERIFICATION_ERROR",
                 Self::MovePrimitiveRuntimeError => "MOVE_PRIMITIVE_RUNTIME_ERROR",
                 Self::MoveAbort => "MOVE_ABORT",
                 Self::VmVerificationOrDeserializationError => {
@@ -1273,7 +1273,7 @@ pub mod execution_error {
                 Self::PackageUpgradeError => "PACKAGE_UPGRADE_ERROR",
                 Self::WrittenObjectsTooLarge => "WRITTEN_OBJECTS_TOO_LARGE",
                 Self::CertificateDenied => "CERTIFICATE_DENIED",
-                Self::SuiMoveVerificationTimedout => "RTD_MOVE_VERIFICATION_TIMEDOUT",
+                Self::RtdMoveVerificationTimedout => "RTD_MOVE_VERIFICATION_TIMEDOUT",
                 Self::ConsensusObjectOperationNotAllowed => {
                     "CONSENSUS_OBJECT_OPERATION_NOT_ALLOWED"
                 }
@@ -1311,7 +1311,7 @@ pub mod execution_error {
                 "PUBLISH_ERROR_NON_ZERO_ADDRESS" => {
                     Some(Self::PublishErrorNonZeroAddress)
                 }
-                "RTD_MOVE_VERIFICATION_ERROR" => Some(Self::SuiMoveVerificationError),
+                "RTD_MOVE_VERIFICATION_ERROR" => Some(Self::RtdMoveVerificationError),
                 "MOVE_PRIMITIVE_RUNTIME_ERROR" => Some(Self::MovePrimitiveRuntimeError),
                 "MOVE_ABORT" => Some(Self::MoveAbort),
                 "VM_VERIFICATION_OR_DESERIALIZATION_ERROR" => {
@@ -1340,7 +1340,7 @@ pub mod execution_error {
                 "WRITTEN_OBJECTS_TOO_LARGE" => Some(Self::WrittenObjectsTooLarge),
                 "CERTIFICATE_DENIED" => Some(Self::CertificateDenied),
                 "RTD_MOVE_VERIFICATION_TIMEDOUT" => {
-                    Some(Self::SuiMoveVerificationTimedout)
+                    Some(Self::RtdMoveVerificationTimedout)
                 }
                 "CONSENSUS_OBJECT_OPERATION_NOT_ALLOWED" => {
                     Some(Self::ConsensusObjectOperationNotAllowed)
@@ -8592,7 +8592,7 @@ pub struct StakingPool {
     #[prost(uint64, optional, tag = "3")]
     pub deactivation_epoch: ::core::option::Option<u64>,
     /// The total number of RTD tokens in this pool, including the RTD in the rewards_pool, as well as in all the principal
-    /// in the `StakedSui` object, updated at epoch boundaries.
+    /// in the `StakedRtd` object, updated at epoch boundaries.
     #[prost(uint64, optional, tag = "4")]
     pub rtd_balance: ::core::option::Option<u64>,
     /// The epoch stake rewards will be added here at the end of each epoch.
@@ -8615,7 +8615,7 @@ pub struct StakingPool {
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     /// This includes both the principal and rewards RTD withdrawn.
     #[prost(uint64, optional, tag = "9")]
-    pub pending_total_sui_withdraw: ::core::option::Option<u64>,
+    pub pending_total_rtd_withdraw: ::core::option::Option<u64>,
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     #[prost(uint64, optional, tag = "10")]
     pub pending_pool_token_withdraw: ::core::option::Option<u64>,

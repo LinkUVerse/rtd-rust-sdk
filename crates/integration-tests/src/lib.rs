@@ -6,7 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
-use rtd_crypto::SuiSigner;
+use rtd_crypto::RtdSigner;
 use rtd_crypto::ed25519::Ed25519PrivateKey;
 use rtd_rpc::Client;
 use rtd_rpc::field::FieldMask;
@@ -70,7 +70,7 @@ async fn wait_for_ready(client: &mut Client) -> Result<()> {
 }
 
 /// Handle for a Rtd network running via pre-compiled binary
-pub struct SuiNetworkHandle {
+pub struct RtdNetworkHandle {
     /// Child process running rtd
     process: Child,
 
@@ -89,20 +89,20 @@ pub struct SuiNetworkHandle {
     pub user_keys: Vec<Ed25519PrivateKey>,
 }
 
-impl Drop for SuiNetworkHandle {
+impl Drop for RtdNetworkHandle {
     fn drop(&mut self) {
         let _ = self.process.kill();
     }
 }
 
-pub struct SuiNetworkBuilder {
+pub struct RtdNetworkBuilder {
     // pub dir: Option<PathBuf>,
     pub num_validators: usize,
     pub epoch_duration_ms: u64,
     pub rtd_binary_path: Option<PathBuf>, // Optional custom binary
 }
 
-impl Default for SuiNetworkBuilder {
+impl Default for RtdNetworkBuilder {
     fn default() -> Self {
         Self {
             num_validators: DEFAULT_NUM_VALIDATORS,
@@ -113,7 +113,7 @@ impl Default for SuiNetworkBuilder {
     }
 }
 
-impl SuiNetworkBuilder {
+impl RtdNetworkBuilder {
     pub fn with_num_validators(mut self, n: usize) -> Self {
         self.num_validators = n;
         self
@@ -134,7 +134,7 @@ impl SuiNetworkBuilder {
     //     self
     // }
 
-    pub async fn build(self) -> Result<SuiNetworkHandle> {
+    pub async fn build(self) -> Result<RtdNetworkHandle> {
         let dir = TempDir::new()?;
         self.generate_genesis(dir.path())?;
         let (validator_keys, user_keys) = load_keys(dir.path())?;
@@ -146,7 +146,7 @@ impl SuiNetworkBuilder {
 
         let mut client = rtd_rpc::Client::new(&rpc_url)?;
         wait_for_ready(&mut client).await?;
-        let mut rtd = SuiNetworkHandle {
+        let mut rtd = RtdNetworkHandle {
             process,
             dir,
             rpc_url,
@@ -157,8 +157,8 @@ impl SuiNetworkBuilder {
             user_keys,
         };
 
-        // Make sure SuiSystemState has been upgraded to v2
-        rtd.upgrade_sui_system_state().await?;
+        // Make sure RtdSystemState has been upgraded to v2
+        rtd.upgrade_rtd_system_state().await?;
 
         // Make sure validator accounts are funded
         let fund_requests = rtd
@@ -274,7 +274,7 @@ fn load_keys(dir: &Path) -> Result<(BTreeMap<Address, Ed25519PrivateKey>, Vec<Ed
     Ok((validator_keys, user_keys))
 }
 
-impl SuiNetworkHandle {
+impl RtdNetworkHandle {
     pub async fn fund(&mut self, requests: &[(Address, u64)]) -> Result<()> {
         let private_key = self.user_keys.first().unwrap();
         let sender = private_key.public_key().derive_address();
@@ -310,7 +310,7 @@ impl SuiNetworkHandle {
         Ok(())
     }
 
-    async fn upgrade_sui_system_state(&mut self) -> Result<()> {
+    async fn upgrade_rtd_system_state(&mut self) -> Result<()> {
         let private_key = self.user_keys.first().unwrap();
         let sender = private_key.public_key().derive_address();
 
@@ -343,7 +343,7 @@ impl SuiNetworkHandle {
 
         assert!(
             response.transaction().effects().status().success(),
-            "upgrade_sui_system_state failed"
+            "upgrade_rtd_system_state failed"
         );
         Ok(())
     }
@@ -484,7 +484,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() -> Result<(), anyhow::Error> {
-        let mut rtd = SuiNetworkBuilder::default().build().await?;
+        let mut rtd = RtdNetworkBuilder::default().build().await?;
 
         // stream ~10 checkpoints to make sure things work
         let mut stream = rtd

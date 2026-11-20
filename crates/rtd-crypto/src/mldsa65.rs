@@ -3,11 +3,11 @@
 //! Pure ML-DSA-65 with an empty context over the 32-byte signing digest,
 //! hedged with 32 bytes of caller-supplied randomness.
 //!
-//! [`SuiRandomizedSigner`](crate::SuiRandomizedSigner) is the randomized
-//! counterpart of [`SuiSigner`](crate::SuiSigner).
+//! [`RtdRandomizedSigner`](crate::RtdRandomizedSigner) is the randomized
+//! counterpart of [`RtdSigner`](crate::RtdSigner).
 
 use crate::SignatureError;
-use mysten_mldsa_native_rs as mldsa;
+use linku_mldsa_native_rs as mldsa;
 use signature::RandomizedSigner;
 use signature::Verifier;
 use rtd_sdk_types::MlDsa65PublicKey;
@@ -18,7 +18,7 @@ use rtd_sdk_types::UserSignature;
 
 /// The 32-byte FIPS 204 seed plus the key expanded from it.
 ///
-/// Only the seed is serialized (keystore, `suiprivkey`); the expanded key is
+/// Only the seed is serialized (keystore, `rtdprivkey`); the expanded key is
 /// kept so signing does not re-expand. Both zeroize on drop.
 pub struct MlDsa65PrivateKey {
     seed: mldsa::SigningKeySeed,
@@ -114,31 +114,31 @@ impl MlDsa65PrivateKey {
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Decode a Bech32 `suiprivkey` string produced by the Rtd CLI; the
+    /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI; the
     /// payload is `0x07 || seed`.
-    pub fn from_suiprivkey(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode(s)?;
+    pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Encode this private key as a Bech32 `suiprivkey` string.
-    pub fn to_suiprivkey(&self) -> Result<String, SignatureError> {
-        crate::suipriv::encode(SignatureScheme::MlDsa65, self.seed())
+    /// Encode this private key as a Bech32 `rtdprivkey` string.
+    pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
+        crate::rtdpriv::encode(SignatureScheme::MlDsa65, self.seed())
     }
 
     /// Decode a Base64 `flag || seed` string, the legacy keystore format used
     /// for entries of the Rtd CLI's `rtd.keystore` file.
     pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode_base64(s)?;
+        let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
     /// Encode this private key as a Base64 `flag || seed` string, the legacy
     /// keystore format used for entries of the Rtd CLI's `rtd.keystore` file.
     pub fn to_base64(&self) -> String {
-        crate::suipriv::encode_base64(SignatureScheme::MlDsa65, self.seed())
+        crate::rtdpriv::encode_base64(SignatureScheme::MlDsa65, self.seed())
     }
 }
 
@@ -243,8 +243,8 @@ impl Verifier<UserSignature> for MlDsa65VerifyingKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::SuiRandomizedSigner;
-    use crate::SuiVerifier;
+    use crate::RtdRandomizedSigner;
+    use crate::RtdVerifier;
     use crate::test_util::TestRng;
     use rtd_sdk_types::PersonalMessage;
     use test_strategy::proptest;
@@ -294,7 +294,7 @@ mod test {
     /// A signature from Rtd's signer verifies here under the same address.
     /// The reverse direction is covered by Rtd's e2e tests.
     #[test]
-    fn verifies_sui_signature() {
+    fn verifies_rtd_signature() {
         let (rtd_signature, rtd_public_key) = rtd_fixture();
         let key = MlDsa65PrivateKey::new([2; 32]);
         assert_eq!(key.public_key(), rtd_public_key);
@@ -357,7 +357,7 @@ mod test {
     #[test]
     fn randomized_signer_is_dyn_compatible() {
         let message = PersonalMessage(b"hello".as_slice().into());
-        let signers: Vec<Box<dyn SuiRandomizedSigner>> = vec![
+        let signers: Vec<Box<dyn RtdRandomizedSigner>> = vec![
             Box::new(MlDsa65PrivateKey::new([2; 32])),
             Box::new(crate::simple::SimpleKeypair::from(MlDsa65PrivateKey::new(
                 [2; 32],
@@ -389,14 +389,14 @@ mod test {
 
     #[cfg(feature = "bech32")]
     #[test]
-    fn suiprivkey_matches_sui_keytool() {
+    fn rtdprivkey_matches_rtd_keytool() {
         // `rtd keytool` encoding of the seed [2; 32], from Rtd's keytool tests.
-        const SUIPRIVKEY: &str =
-            "suiprivkey1qupqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyghdug7";
-        let key = MlDsa65PrivateKey::from_suiprivkey(SUIPRIVKEY).unwrap();
+        const RTDPRIVKEY: &str =
+            "rtdprivkey1qupqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyghdug7";
+        let key = MlDsa65PrivateKey::from_rtdprivkey(RTDPRIVKEY).unwrap();
         assert_eq!(key.seed(), &[2; 32]);
         assert_eq!(key.public_key().derive_address().to_string(), RTD_ADDRESS);
-        assert_eq!(key.to_suiprivkey().unwrap(), SUIPRIVKEY);
+        assert_eq!(key.to_rtdprivkey().unwrap(), RTDPRIVKEY);
         assert_eq!(
             MlDsa65PrivateKey::from_base64(&key.to_base64())
                 .unwrap()
@@ -408,7 +408,7 @@ mod test {
     #[cfg(feature = "ed25519")]
     #[test]
     fn hybrid_multisig() {
-        use crate::SuiSigner;
+        use crate::RtdSigner;
         use crate::multisig::MultisigAggregator;
         use crate::multisig::UserSignatureVerifier;
         use rtd_sdk_types::MultisigCommittee;

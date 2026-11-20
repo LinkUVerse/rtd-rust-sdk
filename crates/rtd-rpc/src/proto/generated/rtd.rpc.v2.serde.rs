@@ -11386,7 +11386,7 @@ impl serde::Serialize for execution_error::ExecutionErrorKind {
             Self::InsufficientCoinBalance => "INSUFFICIENT_COIN_BALANCE",
             Self::CoinBalanceOverflow => "COIN_BALANCE_OVERFLOW",
             Self::PublishErrorNonZeroAddress => "PUBLISH_ERROR_NON_ZERO_ADDRESS",
-            Self::SuiMoveVerificationError => "RTD_MOVE_VERIFICATION_ERROR",
+            Self::RtdMoveVerificationError => "RTD_MOVE_VERIFICATION_ERROR",
             Self::MovePrimitiveRuntimeError => "MOVE_PRIMITIVE_RUNTIME_ERROR",
             Self::MoveAbort => "MOVE_ABORT",
             Self::VmVerificationOrDeserializationError => {
@@ -11412,7 +11412,7 @@ impl serde::Serialize for execution_error::ExecutionErrorKind {
             Self::PackageUpgradeError => "PACKAGE_UPGRADE_ERROR",
             Self::WrittenObjectsTooLarge => "WRITTEN_OBJECTS_TOO_LARGE",
             Self::CertificateDenied => "CERTIFICATE_DENIED",
-            Self::SuiMoveVerificationTimedout => "RTD_MOVE_VERIFICATION_TIMEDOUT",
+            Self::RtdMoveVerificationTimedout => "RTD_MOVE_VERIFICATION_TIMEDOUT",
             Self::ConsensusObjectOperationNotAllowed => {
                 "CONSENSUS_OBJECT_OPERATION_NOT_ALLOWED"
             }
@@ -11565,7 +11565,7 @@ impl<'de> serde::Deserialize<'de> for execution_error::ExecutionErrorKind {
                         )
                     }
                     "RTD_MOVE_VERIFICATION_ERROR" => {
-                        Ok(execution_error::ExecutionErrorKind::SuiMoveVerificationError)
+                        Ok(execution_error::ExecutionErrorKind::RtdMoveVerificationError)
                     }
                     "MOVE_PRIMITIVE_RUNTIME_ERROR" => {
                         Ok(
@@ -11634,7 +11634,7 @@ impl<'de> serde::Deserialize<'de> for execution_error::ExecutionErrorKind {
                     }
                     "RTD_MOVE_VERIFICATION_TIMEDOUT" => {
                         Ok(
-                            execution_error::ExecutionErrorKind::SuiMoveVerificationTimedout,
+                            execution_error::ExecutionErrorKind::RtdMoveVerificationTimedout,
                         )
                     }
                     "CONSENSUS_OBJECT_OPERATION_NOT_ALLOWED" => {
@@ -27532,7 +27532,7 @@ impl serde::Serialize for StakingPool {
         if self.pending_stake.is_some() {
             len += 1;
         }
-        if self.pending_total_sui_withdraw.is_some() {
+        if self.pending_total_rtd_withdraw.is_some() {
             len += 1;
         }
         if self.pending_pool_token_withdraw.is_some() {
@@ -27560,7 +27560,7 @@ impl serde::Serialize for StakingPool {
         if let Some(v) = self.rtd_balance.as_ref() {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("suiBalance", ToString::to_string(&v).as_str())?;
+            struct_ser.serialize_field("rtdBalance", ToString::to_string(&v).as_str())?;
         }
         if let Some(v) = self.rewards_pool.as_ref() {
             #[allow(clippy::needless_borrow)]
@@ -27582,12 +27582,12 @@ impl serde::Serialize for StakingPool {
             struct_ser
                 .serialize_field("pendingStake", ToString::to_string(&v).as_str())?;
         }
-        if let Some(v) = self.pending_total_sui_withdraw.as_ref() {
+        if let Some(v) = self.pending_total_rtd_withdraw.as_ref() {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser
                 .serialize_field(
-                    "pendingTotalSuiWithdraw",
+                    "pendingTotalRtdWithdraw",
                     ToString::to_string(&v).as_str(),
                 )?;
         }
@@ -27619,7 +27619,7 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
             "deactivation_epoch",
             "deactivationEpoch",
             "rtd_balance",
-            "suiBalance",
+            "rtdBalance",
             "rewards_pool",
             "rewardsPool",
             "pool_token_balance",
@@ -27628,8 +27628,8 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
             "exchangeRates",
             "pending_stake",
             "pendingStake",
-            "pending_total_sui_withdraw",
-            "pendingTotalSuiWithdraw",
+            "pending_total_rtd_withdraw",
+            "pendingTotalRtdWithdraw",
             "pending_pool_token_withdraw",
             "pendingPoolTokenWithdraw",
             "extra_fields",
@@ -27640,12 +27640,12 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
             Id,
             ActivationEpoch,
             DeactivationEpoch,
-            SuiBalance,
+            RtdBalance,
             RewardsPool,
             PoolTokenBalance,
             ExchangeRates,
             PendingStake,
-            PendingTotalSuiWithdraw,
+            PendingTotalRtdWithdraw,
             PendingPoolTokenWithdraw,
             ExtraFields,
             __SkipField__,
@@ -27682,8 +27682,8 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                             "deactivationEpoch" | "deactivation_epoch" => {
                                 Ok(GeneratedField::DeactivationEpoch)
                             }
-                            "suiBalance" | "rtd_balance" => {
-                                Ok(GeneratedField::SuiBalance)
+                            "rtdBalance" | "rtd_balance" => {
+                                Ok(GeneratedField::RtdBalance)
                             }
                             "rewardsPool" | "rewards_pool" => {
                                 Ok(GeneratedField::RewardsPool)
@@ -27697,8 +27697,8 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                             "pendingStake" | "pending_stake" => {
                                 Ok(GeneratedField::PendingStake)
                             }
-                            "pendingTotalSuiWithdraw" | "pending_total_sui_withdraw" => {
-                                Ok(GeneratedField::PendingTotalSuiWithdraw)
+                            "pendingTotalRtdWithdraw" | "pending_total_rtd_withdraw" => {
+                                Ok(GeneratedField::PendingTotalRtdWithdraw)
                             }
                             "pendingPoolTokenWithdraw"
                             | "pending_pool_token_withdraw" => {
@@ -27740,7 +27740,7 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                 let mut pool_token_balance__ = None;
                 let mut exchange_rates__ = None;
                 let mut pending_stake__ = None;
-                let mut pending_total_sui_withdraw__ = None;
+                let mut pending_total_rtd_withdraw__ = None;
                 let mut pending_pool_token_withdraw__ = None;
                 let mut extra_fields__ = None;
                 while let Some(k) = map_.next_key()? {
@@ -27775,9 +27775,9 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                                 >()?
                                 .map(|x| x.0);
                         }
-                        GeneratedField::SuiBalance => {
+                        GeneratedField::RtdBalance => {
                             if rtd_balance__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("suiBalance"));
+                                return Err(serde::de::Error::duplicate_field("rtdBalance"));
                             }
                             rtd_balance__ = map_
                                 .next_value::<
@@ -27829,13 +27829,13 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                                 >()?
                                 .map(|x| x.0);
                         }
-                        GeneratedField::PendingTotalSuiWithdraw => {
-                            if pending_total_sui_withdraw__.is_some() {
+                        GeneratedField::PendingTotalRtdWithdraw => {
+                            if pending_total_rtd_withdraw__.is_some() {
                                 return Err(
-                                    serde::de::Error::duplicate_field("pendingTotalSuiWithdraw"),
+                                    serde::de::Error::duplicate_field("pendingTotalRtdWithdraw"),
                                 );
                             }
-                            pending_total_sui_withdraw__ = map_
+                            pending_total_rtd_withdraw__ = map_
                                 .next_value::<
                                     ::std::option::Option<crate::_serde::NumberDeserialize<_>>,
                                 >()?
@@ -27877,7 +27877,7 @@ impl<'de> serde::Deserialize<'de> for StakingPool {
                     pool_token_balance: pool_token_balance__,
                     exchange_rates: exchange_rates__,
                     pending_stake: pending_stake__,
-                    pending_total_sui_withdraw: pending_total_sui_withdraw__,
+                    pending_total_rtd_withdraw: pending_total_rtd_withdraw__,
                     pending_pool_token_withdraw: pending_pool_token_withdraw__,
                     extra_fields: extra_fields__,
                 })

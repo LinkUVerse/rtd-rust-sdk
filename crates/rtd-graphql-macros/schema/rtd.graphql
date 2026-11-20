@@ -72,7 +72,7 @@ type Address implements Node & IAddressable {
 	"""
 	The Address' identifier, a 32-byte number represented as a 64-character hex string, with a lead "0x".
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -196,7 +196,7 @@ input AddressKey {
 	"""
 	The address.
 	"""
-	address: SuiAddress
+	address: RtdAddress
 	"""
 	If specified, sets a checkpoint bound for this address.
 	"""
@@ -405,7 +405,7 @@ input BalanceKey {
 	"""
 	The address that owns the balance.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	The coin type of the balance.
 	"""
@@ -659,7 +659,7 @@ type CoinMetadata implements IAddressable & IMoveObject & IObject {
 	"""
 	The CoinMetadata's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -1003,7 +1003,7 @@ type ConsensusObjectCancelled {
 	"""
 	The ID of the consensus-managed object that the transaction intended to access.
 	"""
-	address: SuiAddress
+	address: RtdAddress
 	"""
 	Reason why the transaction was cancelled.
 	"""
@@ -1082,7 +1082,7 @@ type DynamicField implements Node & IAddressable & IMoveObject & IObject {
 	"""
 	The DynamicField's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -1584,7 +1584,7 @@ input EventFilter {
 	"""
 	Filter on events by transaction sender address.
 	"""
-	sender: SuiAddress
+	sender: RtdAddress
 	"""
 	This field is used to specify the type of event emitted.
 	
@@ -1773,7 +1773,7 @@ Interface implemented by GraphQL types representing entities that are identified
 An address uniquely represents either the public key of an account, or an object's ID, but never both. It is not possible to determine which type an address represents up-front. If an object is wrapped, its contents will not be accessible via its address, but it will still be possible to access other objects it owns.
 """
 interface IAddressable {
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -2000,11 +2000,11 @@ type Linkage {
 	"""
 	The ID on-chain of the first version of the dependency.
 	"""
-	originalId: SuiAddress
+	originalId: RtdAddress
 	"""
 	The ID on-chain of the version of the dependency that this package depends on.
 	"""
-	upgradedId: SuiAddress
+	upgradedId: RtdAddress
 	"""
 	The version of the dependency that this package depends on.
 	"""
@@ -2425,7 +2425,7 @@ type MoveObject implements Node & IAddressable & IMoveObject & IObject {
 	"""
 	The MoveObject's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -2618,7 +2618,7 @@ type MovePackage implements Node & IAddressable & IObject {
 	"""
 	The MovePackage's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -3088,7 +3088,7 @@ type MutateConsensusStreamEnded {
 	"""
 	The ID of the consensus-managed object.
 	"""
-	address: SuiAddress
+	address: RtdAddress
 	"""
 	The sequence number associated with the consensus stream ending.
 	"""
@@ -3129,7 +3129,7 @@ input NameKey {
 	"""
 	The parent object that owns the dynamic field or derived object claim.
 	"""
-	parent: SuiAddress!
+	parent: RtdAddress!
 	"""
 	If specified, fetch the latest version of the result at or before this root version.
 	"""
@@ -3185,7 +3185,7 @@ type Object implements Node & IAddressable & IObject {
 	"""
 	The Object's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Fetch the address as it was at a different root version, or checkpoint.
 	
@@ -3330,7 +3330,7 @@ type ObjectChange {
 	"""
 	The address of the object that has changed.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	Whether the ID was created in this transaction.
 	"""
@@ -3420,7 +3420,7 @@ input ObjectFilter {
 	
 	This field is required if `ownerKind` is "ADDRESS" or "OBJECT". If provided without `ownerKind`, `ownerKind` defaults to "ADDRESS".
 	"""
-	owner: SuiAddress
+	owner: RtdAddress
 	"""
 	Filter on whether the object is address-owned, object-owned, shared, or immutable.
 	
@@ -3454,7 +3454,7 @@ input ObjectKey {
 	"""
 	The object's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	If specified, tries to fetch the latest version as of this checkpoint. Fails if the checkpoint is later than the RPC's latest checkpoint.
 	"""
@@ -3594,7 +3594,7 @@ input PackageKey {
 	"""
 	The object's ID.
 	"""
-	address: SuiAddress!
+	address: RtdAddress!
 	"""
 	If specified, tries to fetch the latest version as of this checkpoint.
 	"""
@@ -3730,7 +3730,7 @@ type PublishCommand {
 	"""
 	IDs of the transitive dependencies of the package to be published.
 	"""
-	dependencies: [SuiAddress!]
+	dependencies: [RtdAddress!]
 	"""
 	Bytecode for the modules to be published, BCS serialized and Base64 encoded.
 	"""
@@ -3749,7 +3749,7 @@ type Pure {
 
 type Query {
 	"""
-	Look-up an account by its SuiAddress.
+	Look-up an account by its RtdAddress.
 	
 	If `rootVersion` is specified, nested dynamic field accesses will be fetched at or before this version. This can be used to fetch a child or descendant object bounded by its root object's version, when its immediate parent is wrapped, or a value in a dynamic object field. For any wrapped or child (object-owned) object, its root object can be defined recursively as:
 	
@@ -3765,7 +3765,7 @@ type Query {
 	
 	If the address is fetched by name and the name does not resolve to an address (e.g. the name does not exist or has expired), `null` is returned.
 	"""
-	address(address: SuiAddress, name: String, rootVersion: UInt53, atCheckpoint: UInt53): Address
+	address(address: RtdAddress, name: String, rootVersion: UInt53, atCheckpoint: UInt53): Address
 	"""
 	The network's genesis checkpoint digest (uniquely identifies the network), Base58-encoded.
 	"""
@@ -3907,11 +3907,11 @@ type Query {
 	
 	Returns `null` if an object cannot be found that meets this criteria.
 	"""
-	object(address: SuiAddress!, version: UInt53, rootVersion: UInt53, atCheckpoint: UInt53): Object
+	object(address: RtdAddress!, version: UInt53, rootVersion: UInt53, atCheckpoint: UInt53): Object
 	"""
 	Paginate all versions of an object at `address`, optionally bounding the versions exclusively from below with `filter.afterVersion` or from above with `filter.beforeVersion`.
 	"""
-	objectVersions(first: Int, after: String, last: Int, before: String, address: SuiAddress!, filter: VersionFilter): ObjectConnection
+	objectVersions(first: Int, after: String, last: Int, before: String, address: RtdAddress!, filter: VersionFilter): ObjectConnection
 	"""
 	Paginate objects in the live object set, optionally filtered by owner and/or type. `filter` can be one of:
 	
@@ -3933,13 +3933,13 @@ type Query {
 	
 	Note that this interpretation of `version` and "latest" differs from the one used by `Query.object`, because non-system package upgrades generate objects with different IDs. To fetch a package using the versioning semantics of objects, use `Object.asMovePackage` nested under `Query.object`.
 	"""
-	package(address: SuiAddress!, version: UInt53, atCheckpoint: UInt53): MovePackage
+	package(address: RtdAddress!, version: UInt53, atCheckpoint: UInt53): MovePackage
 	"""
 	Paginate all versions of a package at `address`, optionally bounding the versions exclusively from below with `filter.afterVersion` or from above with `filter.beforeVersion`.
 	
 	Different versions of a package will have different object IDs, unless they are system packages, but will share the same original ID.
 	"""
-	packageVersions(first: Int, after: String, last: Int, before: String, address: SuiAddress!, filter: VersionFilter): MovePackageConnection
+	packageVersions(first: Int, after: String, last: Int, before: String, address: RtdAddress!, filter: VersionFilter): MovePackageConnection
 	"""
 	Paginate all packages published on-chain, optionally bounded to packages published strictly after `filter.afterCheckpoint` and/or strictly before `filter.beforeCheckpoint`.
 	"""
@@ -4006,7 +4006,7 @@ type Query {
 	`TransactionData`.
 	- `author` is the signer's address.
 	"""
-	verifySignature(message: Base64!, signature: Base64!, intentScope: IntentScope!, author: SuiAddress!): SignatureVerifyResult
+	verifySignature(message: Base64!, signature: Base64!, intentScope: IntentScope!, author: RtdAddress!): SignatureVerifyResult
 	"""
 	Verify a zkLogin signature is from the given `author`.
 	
@@ -4017,7 +4017,7 @@ type Query {
 	- `intentScope` indicates whether `bytes` are to be parsed as a personal message or `TransactionData`.
 	- `author` is the signer's address.
 	"""
-	verifyZkLoginSignature(bytes: Base64!, signature: Base64!, intentScope: ZkLoginIntentScope!, author: SuiAddress!): ZkLoginVerifyResult @deprecated(reason: "Use `verifySignature` instead, which supports all signature types.")
+	verifyZkLoginSignature(bytes: Base64!, signature: Base64!, intentScope: ZkLoginIntentScope!, author: RtdAddress!): ZkLoginVerifyResult @deprecated(reason: "Use `verifySignature` instead, which supports all signature types.")
 }
 
 """
@@ -4059,7 +4059,7 @@ type ReadConsensusStreamEnded {
 	"""
 	The ID of the consensus-managed object.
 	"""
-	address: SuiAddress
+	address: RtdAddress
 	"""
 	The sequence number associated with the consensus stream ending.
 	"""
@@ -4285,7 +4285,7 @@ type SharedInput {
 	"""
 	The address of the shared object.
 	"""
-	address: SuiAddress
+	address: RtdAddress
 	"""
 	The version that this object was shared at.
 	"""
@@ -4384,9 +4384,9 @@ type Subscription {
 }
 
 """
-String containing 32 byte hex-encoded address, with a leading '0x'. Leading zeroes can be omitted on input but will always appear in outputs (SuiAddress in output is guaranteed to be 66 characters long).
+String containing 32 byte hex-encoded address, with a leading '0x'. Leading zeroes can be omitted on input but will always appear in outputs (RtdAddress in output is guaranteed to be 66 characters long).
 """
-scalar SuiAddress
+scalar RtdAddress
 
 """
 Future behavior of a currency's supply.
@@ -4573,13 +4573,13 @@ input TransactionFilter {
 	Limit to transactions that interacted with the given address.
 	The address could be a sender, sponsor, or recipient of the transaction.
 	"""
-	affectedAddress: SuiAddress
+	affectedAddress: RtdAddress
 	"""
 	Limit to transactions that interacted with the given object.
 	The object could have been created, read, modified, deleted, wrapped, or unwrapped by the transaction.
 	Objects that were passed as a `Receiving` input are not considered to have been affected by a transaction unless they were actually received.
 	"""
-	affectedObject: SuiAddress
+	affectedObject: RtdAddress
 	"""
 	Filter to transactions that occurred strictly after the given checkpoint.
 	"""
@@ -4603,7 +4603,7 @@ input TransactionFilter {
 	"""
 	Limit to transactions that were sent by the given address.
 	"""
-	sentAddress: SuiAddress
+	sentAddress: RtdAddress
 }
 
 """
@@ -4700,7 +4700,7 @@ type TypeOrigin {
 	"""
 	The storage ID of the package that first defined this type.
 	"""
-	definingId: SuiAddress
+	definingId: RtdAddress
 	"""
 	Module defining the type.
 	"""
@@ -4757,11 +4757,11 @@ type UpgradeCommand {
 	"""
 	ID of the package being upgraded.
 	"""
-	currentPackage: SuiAddress
+	currentPackage: RtdAddress
 	"""
 	IDs of the transitive dependencies of the package to be published.
 	"""
-	dependencies: [SuiAddress!]
+	dependencies: [RtdAddress!]
 	"""
 	Bytecode for the modules to be published, BCS serialized and Base64 encoded.
 	"""

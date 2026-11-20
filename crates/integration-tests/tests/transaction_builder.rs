@@ -1,7 +1,7 @@
 use anyhow::Result;
-use integration_tests::SuiNetworkBuilder;
+use integration_tests::RtdNetworkBuilder;
 use std::str::FromStr;
-use rtd_crypto::SuiSigner;
+use rtd_crypto::RtdSigner;
 use rtd_rpc::field::FieldMask;
 use rtd_rpc::field::FieldMaskUtil;
 use rtd_rpc::proto::rtd::rpc::v2::ExecuteTransactionRequest;
@@ -15,7 +15,7 @@ use rtd_transaction_builder::TransactionBuilder;
 
 #[tokio::test]
 async fn test_move_call() -> Result<()> {
-    let mut rtd = SuiNetworkBuilder::default().build().await?;
+    let mut rtd = RtdNetworkBuilder::default().build().await?;
     let private_key = rtd.user_keys.first().unwrap();
     let sender = private_key.public_key().derive_address();
 
@@ -162,7 +162,7 @@ async fn test_move_call() -> Result<()> {
 
 #[tokio::test]
 async fn test_publish() {
-    let mut rtd = SuiNetworkBuilder::default().build().await.unwrap();
+    let mut rtd = RtdNetworkBuilder::default().build().await.unwrap();
     let private_key = rtd.user_keys.first().unwrap();
     let sender = private_key.public_key().derive_address();
 
@@ -195,7 +195,7 @@ async fn test_publish() {
 
 #[tokio::test]
 async fn test_upgrade() -> Result<()> {
-    let mut rtd = SuiNetworkBuilder::default().build().await.unwrap();
+    let mut rtd = RtdNetworkBuilder::default().build().await.unwrap();
     let private_key = rtd.user_keys.first().unwrap();
     let sender = private_key.public_key().derive_address();
 

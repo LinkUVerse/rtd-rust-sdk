@@ -23,8 +23,8 @@ const MAX_REWARDS_PER_PTB: usize = 1023;
 
 #[derive(Debug)]
 pub struct DelegatedStake {
-    /// ObjectId of this StakedSui delegation.
-    pub staked_sui_id: Address,
+    /// ObjectId of this StakedRtd delegation.
+    pub staked_rtd_id: Address,
     /// Validator's Address.
     pub validator_address: Address,
     /// Staking pool object id.
@@ -38,7 +38,7 @@ pub struct DelegatedStake {
 }
 
 #[derive(serde::Deserialize, Debug)]
-struct StakedSui {
+struct StakedRtd {
     id: Address,
     /// ID of the staking pool we are staking with.
     pool_id: Address,
@@ -49,11 +49,11 @@ struct StakedSui {
 }
 
 impl Client {
-    pub async fn get_delegated_stake(&mut self, staked_sui_id: &Address) -> Result<DelegatedStake> {
-        let maybe_staked_sui = self
+    pub async fn get_delegated_stake(&mut self, staked_rtd_id: &Address) -> Result<DelegatedStake> {
+        let maybe_staked_rtd = self
             .ledger_client()
             .get_object(
-                GetObjectRequest::new(staked_sui_id)
+                GetObjectRequest::new(staked_rtd_id)
                     .with_read_mask(FieldMask::from_str("contents")),
             )
             .await?
@@ -62,13 +62,13 @@ impl Client {
             .unwrap_or_default();
 
         let mut stakes = self
-            .try_create_delegated_stake_info(&[maybe_staked_sui])
+            .try_create_delegated_stake_info(&[maybe_staked_rtd])
             .await?;
         Ok(stakes.remove(0))
     }
 
     pub async fn list_delegated_stake(&mut self, address: &Address) -> Result<Vec<DelegatedStake>> {
-        const STAKED_SUI_TYPE: &str = "0x3::staking_pool::StakedSui";
+        const STAKED_RTD_TYPE: &str = "0x3::staking_pool::StakedRtd";
 
         let mut delegated_stakes = Vec::new();
 
@@ -76,7 +76,7 @@ impl Client {
             .with_owner(address)
             .with_page_size(500u32)
             .with_read_mask(FieldMask::from_str("contents"))
-            .with_object_type(STAKED_SUI_TYPE);
+            .with_object_type(STAKED_RTD_TYPE);
 
         loop {
             let response = self
@@ -85,7 +85,7 @@ impl Client {
                 .await?
                 .into_inner();
 
-            // with the fetched StakedSui objects, attempt to calculate the rewards and create a
+            // with the fetched StakedRtd objects, attempt to calculate the rewards and create a
             // DelegatedStake for each.
             delegated_stakes.extend(
                 self.try_create_delegated_stake_info(&response.objects)
@@ -106,35 +106,35 @@ impl Client {
 
     async fn try_create_delegated_stake_info(
         &mut self,
-        maybe_staked_sui: &[Object],
+        maybe_staked_rtd: &[Object],
     ) -> Result<Vec<DelegatedStake>> {
-        let staked_suis = maybe_staked_sui
+        let staked_rtds = maybe_staked_rtd
             .iter()
             .map(|o| {
                 o.contents()
-                    .deserialize::<StakedSui>()
+                    .deserialize::<StakedRtd>()
                     .map_err(Into::into)
                     .map_err(tonic::Status::from_error)
             })
-            .collect::<Result<Vec<StakedSui>>>()?;
+            .collect::<Result<Vec<StakedRtd>>>()?;
 
-        let ids = staked_suis.iter().map(|s| s.id).collect::<Vec<_>>();
-        let pool_ids = staked_suis.iter().map(|s| s.pool_id).collect::<Vec<_>>();
+        let ids = staked_rtds.iter().map(|s| s.id).collect::<Vec<_>>();
+        let pool_ids = staked_rtds.iter().map(|s| s.pool_id).collect::<Vec<_>>();
 
         let rewards = self.calculate_rewards(&ids).await?;
         let validator_addresses = self.get_validator_address_by_pool_id(&pool_ids).await?;
 
-        Ok(staked_suis
+        Ok(staked_rtds
             .into_iter()
             .zip(rewards)
             .zip(validator_addresses)
             .map(
-                |((staked_sui, (_id, rewards)), (_pool_id, validator_address))| DelegatedStake {
-                    staked_sui_id: staked_sui.id,
+                |((staked_rtd, (_id, rewards)), (_pool_id, validator_address))| DelegatedStake {
+                    staked_rtd_id: staked_rtd.id,
                     validator_address,
-                    staking_pool: staked_sui.pool_id,
-                    activation_epoch: staked_sui.stake_activation_epoch,
-                    principal: staked_sui.principal,
+                    staking_pool: staked_rtd.pool_id,
+                    activation_epoch: staked_rtd.stake_activation_epoch,
+                    principal: staked_rtd.principal,
                     rewards,
                 },
             )
@@ -143,9 +143,9 @@ impl Client {
 
     pub async fn calculate_rewards(
         &mut self,
-        staked_sui_ids: &[Address],
+        staked_rtd_ids: &[Address],
     ) -> Result<Vec<(Address, u64)>> {
-        let batches = staked_sui_ids.chunks(MAX_REWARDS_PER_PTB).map(|batch| {
+        let batches = staked_rtd_ids.chunks(MAX_REWARDS_PER_PTB).map(|batch| {
             let mut client = self.clone();
             async move { client.calculate_rewards_batch(batch).await }
         });
@@ -155,14 +155,14 @@ impl Client {
 
     async fn calculate_rewards_batch(
         &mut self,
-        staked_sui_ids: &[Address],
+        staked_rtd_ids: &[Address],
     ) -> Result<Vec<(Address, u64)>> {
         let mut ptb = ProgrammableTransaction::default()
             .with_inputs(vec![Input::default().with_object_id("0x5")]);
         let system_object = Argument::new_input(0);
 
-        for id in staked_sui_ids {
-            let staked_sui = Argument::new_input(ptb.inputs.len() as u16);
+        for id in staked_rtd_ids {
+            let staked_rtd = Argument::new_input(ptb.inputs.len() as u16);
 
             ptb.inputs.push(Input::default().with_object_id(id));
 
@@ -171,7 +171,7 @@ impl Client {
                     .with_package("0x3")
                     .with_module("rtd_system")
                     .with_function("calculate_rewards")
-                    .with_arguments(vec![system_object, staked_sui])
+                    .with_arguments(vec![system_object, staked_rtd])
                     .into(),
             );
         }
@@ -197,15 +197,15 @@ impl Client {
             ));
         }
 
-        if staked_sui_ids.len() != resp.command_outputs.len() {
+        if staked_rtd_ids.len() != resp.command_outputs.len() {
             return Err(tonic::Status::from_error(
                 "missing transaction command_outputs".into(),
             ));
         }
 
-        let mut rewards = Vec::with_capacity(staked_sui_ids.len());
+        let mut rewards = Vec::with_capacity(staked_rtd_ids.len());
 
-        for (id, output) in staked_sui_ids.iter().zip(resp.command_outputs) {
+        for (id, output) in staked_rtd_ids.iter().zip(resp.command_outputs) {
             let bcs_rewards = output
                 .return_values
                 .first()

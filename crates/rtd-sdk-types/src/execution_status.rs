@@ -168,7 +168,7 @@ pub enum ExecutionError {
     PublishErrorNonZeroAddress,
 
     /// Rtd Move Bytecode Verification Error.
-    SuiMoveVerificationError,
+    RtdMoveVerificationError,
 
     //
     // MoveVm Errors
@@ -245,7 +245,7 @@ pub enum ExecutionError {
     CertificateDenied,
 
     /// Rtd Move Bytecode verification timed out.
-    SuiMoveVerificationTimedout,
+    RtdMoveVerificationTimedout,
 
     /// The requested consensus object operation is not allowed
     ConsensusObjectOperationNotAllowed,

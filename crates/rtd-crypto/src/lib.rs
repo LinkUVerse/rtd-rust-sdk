@@ -64,7 +64,7 @@ pub mod simple;
     feature = "secp256k1",
     feature = "mldsa65"
 ))]
-mod suipriv;
+mod rtdpriv;
 
 #[cfg(any(
     feature = "ed25519",
@@ -109,11 +109,11 @@ pub use multisig::UserSignatureVerifier;
 ///
 /// # Note
 ///
-/// There is a blanket implementation of `SuiSigner` for all `T` where `T:
+/// There is a blanket implementation of `RtdSigner` for all `T` where `T:
 /// `[`Signer`]`<`[`UserSignature`]`>` so it is generally recommended for a signer to implement
 /// `Signer<UserSignature>` and rely on the blanket implementation which handles the proper
 /// construction of the signing message.
-pub trait SuiSigner {
+pub trait RtdSigner {
     fn sign_transaction(&self, transaction: &Transaction) -> Result<UserSignature, SignatureError>;
     fn sign_personal_message(
         &self,
@@ -121,7 +121,7 @@ pub trait SuiSigner {
     ) -> Result<UserSignature, SignatureError>;
 }
 
-impl<T: Signer<UserSignature>> SuiSigner for T {
+impl<T: Signer<UserSignature>> RtdSigner for T {
     fn sign_transaction(&self, transaction: &Transaction) -> Result<UserSignature, SignatureError> {
         let msg = transaction.signing_digest();
         self.try_sign(&msg)
@@ -139,20 +139,20 @@ impl<T: Signer<UserSignature>> SuiSigner for T {
 /// Interface for signing user transactions and messages with a scheme that
 /// takes fresh randomness per signature
 ///
-/// Randomized counterpart of [`SuiSigner`]. Today that is ML-DSA-65 only.
+/// Randomized counterpart of [`RtdSigner`]. Today that is ML-DSA-65 only.
 ///
 /// # Note
 ///
-/// There is a blanket implementation of `SuiRandomizedSigner` for all `T`
+/// There is a blanket implementation of `RtdRandomizedSigner` for all `T`
 /// where `T: `[`signature::RandomizedSigner`]`<`[`UserSignature`]`>`, which handles the
 /// proper construction of the signing message.
 ///
 /// The rng is taken as `&mut dyn CryptoRngCore` rather than `&mut impl
 /// CryptoRngCore` so that the trait stays dyn-compatible, like
-/// [`SuiSigner`], and signers can be held as `dyn SuiRandomizedSigner`.
+/// [`RtdSigner`], and signers can be held as `dyn RtdRandomizedSigner`.
 #[cfg(feature = "mldsa65")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "mldsa65")))]
-pub trait SuiRandomizedSigner {
+pub trait RtdRandomizedSigner {
     fn sign_transaction_with_rng(
         &self,
         rng: &mut dyn rand_core::CryptoRngCore,
@@ -166,7 +166,7 @@ pub trait SuiRandomizedSigner {
 }
 
 #[cfg(feature = "mldsa65")]
-impl<T: signature::RandomizedSigner<UserSignature>> SuiRandomizedSigner for T {
+impl<T: signature::RandomizedSigner<UserSignature>> RtdRandomizedSigner for T {
     fn sign_transaction_with_rng(
         &self,
         mut rng: &mut dyn rand_core::CryptoRngCore,
@@ -190,11 +190,11 @@ impl<T: signature::RandomizedSigner<UserSignature>> SuiRandomizedSigner for T {
 ///
 /// # Note
 ///
-/// There is a blanket implementation of `SuiVerifier` for all `T` where `T:
+/// There is a blanket implementation of `RtdVerifier` for all `T` where `T:
 /// `[`Verifier`]`<`[`UserSignature`]`>` so it is generally recommended for a signer to implement
 /// `Verifier<UserSignature>` and rely on the blanket implementation which handles the proper
 /// construction of the signing message.
-pub trait SuiVerifier {
+pub trait RtdVerifier {
     fn verify_transaction(
         &self,
         transaction: &Transaction,
@@ -207,7 +207,7 @@ pub trait SuiVerifier {
     ) -> Result<(), SignatureError>;
 }
 
-impl<T: Verifier<UserSignature>> SuiVerifier for T {
+impl<T: Verifier<UserSignature>> RtdVerifier for T {
     fn verify_transaction(
         &self,
         transaction: &Transaction,

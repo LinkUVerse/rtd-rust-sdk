@@ -128,21 +128,21 @@ impl Ed25519PrivateKey {
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Decode a Bech32 `suiprivkey` string produced by the Rtd CLI.
+    /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
     ///
-    /// Returns an error if the string does not have the `suiprivkey` HRP, has
+    /// Returns an error if the string does not have the `rtdprivkey` HRP, has
     /// an invalid Bech32 (BIP-173) checksum, has a flag byte that is not
     /// Ed25519, or has the wrong number of key bytes.
-    pub fn from_suiprivkey(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode(s)?;
+    pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Encode this private key as a Bech32 `suiprivkey` string.
-    pub fn to_suiprivkey(&self) -> Result<String, SignatureError> {
-        crate::suipriv::encode(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
+    /// Encode this private key as a Bech32 `rtdprivkey` string.
+    pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
+        crate::rtdpriv::encode(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
     }
 
     /// Decode a Base64 `flag || private_key` string, the legacy keystore
@@ -151,7 +151,7 @@ impl Ed25519PrivateKey {
     /// Returns an error if the string is not valid Base64, has a flag byte
     /// that is not Ed25519, or has the wrong number of key bytes.
     pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode_base64(s)?;
+        let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
@@ -159,7 +159,7 @@ impl Ed25519PrivateKey {
     /// legacy keystore format used for entries of the Rtd CLI's
     /// `rtd.keystore` file.
     pub fn to_base64(&self) -> String {
-        crate::suipriv::encode_base64(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
+        crate::rtdpriv::encode_base64(SignatureScheme::Ed25519, self.0.to_bytes().as_slice())
     }
 }
 
@@ -322,8 +322,8 @@ impl Verifier<UserSignature> for Ed25519Verifier {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::SuiSigner;
-    use crate::SuiVerifier;
+    use crate::RtdSigner;
+    use crate::RtdVerifier;
     use rtd_sdk_types::PersonalMessage;
     use test_strategy::proptest;
 

@@ -197,7 +197,7 @@ impl Client {
                 json @include(if: $withJson)
                 bcs @include(if: $withBcs)
             }
-            query($parent: SuiAddress!, $cursor: String, $withJson: Boolean!, $withBcs: Boolean!) {
+            query($parent: RtdAddress!, $cursor: String, $withJson: Boolean!, $withBcs: Boolean!) {
                 object(address: $parent) {
                     dynamicFields(after: $cursor) {
                         nodes {
@@ -272,7 +272,7 @@ impl Client {
                 json @include(if: $withJson)
                 bcs @include(if: $withBcs)
             }
-            query($parent: SuiAddress!, $name: DynamicFieldName!, $withJson: Boolean!, $withBcs: Boolean!) {
+            query($parent: RtdAddress!, $name: DynamicFieldName!, $withJson: Boolean!, $withBcs: Boolean!) {
                 object(address: $parent) {
                     dynamicField(name: $name) {
                         name { ...MoveValueFields }
@@ -293,7 +293,7 @@ impl Client {
                 json @include(if: $withJson)
                 bcs @include(if: $withBcs)
             }
-            query($parent: SuiAddress!, $name: DynamicFieldName!, $withJson: Boolean!, $withBcs: Boolean!) {
+            query($parent: RtdAddress!, $name: DynamicFieldName!, $withJson: Boolean!, $withBcs: Boolean!) {
                 object(address: $parent) {
                     dynamicObjectField(name: $name) {
                         name { ...MoveValueFields }

@@ -180,7 +180,7 @@ impl Coin {
     /// ```
     /// use rtd_transaction_builder::intent::Coin;
     ///
-    /// let one_sui = Coin::rtd(1_000_000_000);
+    /// let one_rtd = Coin::rtd(1_000_000_000);
     /// ```
     pub fn rtd(balance: u64) -> Self {
         Self {
@@ -264,7 +264,7 @@ impl Balance {
     /// ```
     /// use rtd_transaction_builder::intent::Balance;
     ///
-    /// let one_sui = Balance::rtd(1_000_000_000);
+    /// let one_rtd = Balance::rtd(1_000_000_000);
     /// ```
     pub fn rtd(balance: u64) -> Self {
         Self {

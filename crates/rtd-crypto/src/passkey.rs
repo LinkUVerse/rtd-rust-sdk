@@ -64,7 +64,7 @@ impl Verifier<UserSignature> for PasskeyVerifier {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::SuiVerifier;
+    use crate::RtdVerifier;
     use rtd_sdk_types::Transaction;
 
     #[cfg(target_arch = "wasm32")]

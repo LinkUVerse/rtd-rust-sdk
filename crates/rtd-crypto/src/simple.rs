@@ -307,29 +307,29 @@ mod keypair {
 
         #[cfg(feature = "bech32")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-        /// Decode a Bech32 `suiprivkey` string produced by the Rtd CLI.
+        /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
         ///
         /// The leading flag byte selects the scheme. Only the simple schemes
         /// (Ed25519, Secp256k1, Secp256r1) are accepted, matching the
         /// upstream `rtd-types` parser.
-        pub fn from_suiprivkey(s: &str) -> Result<Self, SignatureError> {
-            let (scheme, key) = crate::suipriv::decode(s)?;
+        pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+            let (scheme, key) = crate::rtdpriv::decode(s)?;
             Self::from_flagged_key_bytes(scheme, key)
         }
 
         #[cfg(feature = "bech32")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-        /// Encode this private key as a Bech32 `suiprivkey` string.
-        pub fn to_suiprivkey(&self) -> Result<String, SignatureError> {
+        /// Encode this private key as a Bech32 `rtdprivkey` string.
+        pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
             match &self.inner {
                 #[cfg(feature = "ed25519")]
-                InnerKeypair::Ed25519(private_key) => private_key.to_suiprivkey(),
+                InnerKeypair::Ed25519(private_key) => private_key.to_rtdprivkey(),
                 #[cfg(feature = "secp256k1")]
-                InnerKeypair::Secp256k1(private_key) => private_key.to_suiprivkey(),
+                InnerKeypair::Secp256k1(private_key) => private_key.to_rtdprivkey(),
                 #[cfg(feature = "secp256r1")]
-                InnerKeypair::Secp256r1(private_key) => private_key.to_suiprivkey(),
+                InnerKeypair::Secp256r1(private_key) => private_key.to_rtdprivkey(),
                 #[cfg(feature = "mldsa65")]
-                InnerKeypair::MlDsa65(private_key) => private_key.to_suiprivkey(),
+                InnerKeypair::MlDsa65(private_key) => private_key.to_rtdprivkey(),
             }
         }
 
@@ -340,7 +340,7 @@ mod keypair {
         /// (Ed25519, Secp256k1, Secp256r1) are accepted, matching the
         /// upstream `rtd-types` parser.
         pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
-            let (scheme, key) = crate::suipriv::decode_base64(s)?;
+            let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
             Self::from_flagged_key_bytes(scheme, key)
         }
 
@@ -393,7 +393,7 @@ mod keypair {
 
     /// Signs with any scheme; the deterministic ones ignore `rng`. Use this
     /// when the scheme is only known at run time, e.g. a key loaded from
-    /// `suiprivkey`.
+    /// `rtdprivkey`.
     #[cfg(feature = "mldsa65")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "mldsa65")))]
     impl signature::RandomizedSigner<SimpleSignature> for SimpleKeypair {
@@ -1005,7 +1005,7 @@ mod test {
         assert_eq!(keypair.verifying_key().derive_address(), expected);
     }
 
-    // Round-trip and rejection tests for the suiprivkey Bech32 format.
+    // Round-trip and rejection tests for the rtdprivkey Bech32 format.
     //
     // These mirror the format produced by the Rtd CLI and the upstream
     // `rtd-types` crate. `EXPECTED_ED25519_VECTOR` is taken directly from
@@ -1021,81 +1021,81 @@ mod test {
         use wasm_bindgen_test::wasm_bindgen_test as test;
 
         // Upstream test vector: `Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32]))`
-        // encoded with `SuiKeyPair::encode()` produces this string. The leading
+        // encoded with `RtdKeyPair::encode()` produces this string. The leading
         // flag byte is 0x00 (Ed25519); the remaining 32 bytes are the private
         // key.
-        const UPSTREAM_ED25519_SUIPRIVKEY: &str =
-            "suiprivkey1qzdlfxn2qa2lj5uprl8pyhexs02sg2wrhdy7qaq50cqgnffw4c2477kg9h3";
+        const UPSTREAM_ED25519_RTDPRIVKEY: &str =
+            "rtdprivkey1qzdlfxn2qa2lj5uprl8pyhexs02sg2wrhdy7qaq50cqgnffw4c2477kg9h3";
 
         #[proptest]
         fn ed25519_round_trip(signer: Ed25519PrivateKey) {
-            let encoded = signer.to_suiprivkey().unwrap();
-            let decoded = Ed25519PrivateKey::from_suiprivkey(&encoded).unwrap();
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Ed25519PrivateKey::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(decoded.public_key(), signer.public_key());
 
             // SimpleKeypair dispatch agrees.
-            let keypair = SimpleKeypair::from_suiprivkey(&encoded).unwrap();
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(keypair.scheme(), signer.scheme());
-            assert_eq!(encoded, keypair.to_suiprivkey().unwrap());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
         }
 
         #[proptest]
         fn secp256k1_round_trip(signer: Secp256k1PrivateKey) {
-            let encoded = signer.to_suiprivkey().unwrap();
-            let decoded = Secp256k1PrivateKey::from_suiprivkey(&encoded).unwrap();
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Secp256k1PrivateKey::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(decoded.public_key(), signer.public_key());
 
-            let keypair = SimpleKeypair::from_suiprivkey(&encoded).unwrap();
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(keypair.scheme(), signer.scheme());
-            assert_eq!(encoded, keypair.to_suiprivkey().unwrap());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
         }
 
         #[proptest]
         fn secp256r1_round_trip(signer: Secp256r1PrivateKey) {
-            let encoded = signer.to_suiprivkey().unwrap();
-            let decoded = Secp256r1PrivateKey::from_suiprivkey(&encoded).unwrap();
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = Secp256r1PrivateKey::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(decoded.public_key(), signer.public_key());
 
-            let keypair = SimpleKeypair::from_suiprivkey(&encoded).unwrap();
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(keypair.scheme(), signer.scheme());
-            assert_eq!(encoded, keypair.to_suiprivkey().unwrap());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
         }
 
         #[proptest]
         fn mldsa65_round_trip(signer: MlDsa65PrivateKey) {
-            let encoded = signer.to_suiprivkey().unwrap();
-            let decoded = MlDsa65PrivateKey::from_suiprivkey(&encoded).unwrap();
+            let encoded = signer.to_rtdprivkey().unwrap();
+            let decoded = MlDsa65PrivateKey::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(decoded.public_key(), signer.public_key());
 
-            let keypair = SimpleKeypair::from_suiprivkey(&encoded).unwrap();
+            let keypair = SimpleKeypair::from_rtdprivkey(&encoded).unwrap();
             assert_eq!(keypair.scheme(), signer.scheme());
             assert_eq!(
                 keypair.verifying_key(),
                 SimpleVerifiyingKey::from(signer.verifying_key())
             );
-            assert_eq!(encoded, keypair.to_suiprivkey().unwrap());
+            assert_eq!(encoded, keypair.to_rtdprivkey().unwrap());
 
             // Wrong-scheme per-scheme decoders reject it.
-            Ed25519PrivateKey::from_suiprivkey(&encoded).unwrap_err();
-            Secp256k1PrivateKey::from_suiprivkey(&encoded).unwrap_err();
-            Secp256r1PrivateKey::from_suiprivkey(&encoded).unwrap_err();
+            Ed25519PrivateKey::from_rtdprivkey(&encoded).unwrap_err();
+            Secp256k1PrivateKey::from_rtdprivkey(&encoded).unwrap_err();
+            Secp256r1PrivateKey::from_rtdprivkey(&encoded).unwrap_err();
         }
 
         #[test]
         fn upstream_ed25519_vector_round_trips() {
-            let keypair = SimpleKeypair::from_suiprivkey(UPSTREAM_ED25519_SUIPRIVKEY).unwrap();
+            let keypair = SimpleKeypair::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap();
             assert_eq!(keypair.scheme(), SignatureScheme::Ed25519);
             assert_eq!(
-                keypair.to_suiprivkey().unwrap(),
-                UPSTREAM_ED25519_SUIPRIVKEY
+                keypair.to_rtdprivkey().unwrap(),
+                UPSTREAM_ED25519_RTDPRIVKEY
             );
 
             // Per-scheme decoder accepts it too.
-            Ed25519PrivateKey::from_suiprivkey(UPSTREAM_ED25519_SUIPRIVKEY).unwrap();
+            Ed25519PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap();
             // Wrong-scheme per-scheme decoders reject it.
-            Secp256k1PrivateKey::from_suiprivkey(UPSTREAM_ED25519_SUIPRIVKEY).unwrap_err();
-            Secp256r1PrivateKey::from_suiprivkey(UPSTREAM_ED25519_SUIPRIVKEY).unwrap_err();
-            MlDsa65PrivateKey::from_suiprivkey(UPSTREAM_ED25519_SUIPRIVKEY).unwrap_err();
+            Secp256k1PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap_err();
+            Secp256r1PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap_err();
+            MlDsa65PrivateKey::from_rtdprivkey(UPSTREAM_ED25519_RTDPRIVKEY).unwrap_err();
         }
 
         #[test]
@@ -1103,42 +1103,42 @@ mod test {
             // Same payload as the upstream Ed25519 vector but encoded with a
             // different HRP — must fail.
             let bytes = ::bech32::primitives::decode::CheckedHrpstring::new::<::bech32::Bech32>(
-                UPSTREAM_ED25519_SUIPRIVKEY,
+                UPSTREAM_ED25519_RTDPRIVKEY,
             )
             .unwrap()
             .byte_iter()
             .collect::<Vec<_>>();
-            let wrong_hrp = ::bech32::Hrp::parse("notsui").unwrap();
+            let wrong_hrp = ::bech32::Hrp::parse("notrtd").unwrap();
             let encoded = ::bech32::encode::<::bech32::Bech32>(wrong_hrp, &bytes).unwrap();
 
-            SimpleKeypair::from_suiprivkey(&encoded).unwrap_err();
-            Ed25519PrivateKey::from_suiprivkey(&encoded).unwrap_err();
+            SimpleKeypair::from_rtdprivkey(&encoded).unwrap_err();
+            Ed25519PrivateKey::from_rtdprivkey(&encoded).unwrap_err();
         }
 
         #[test]
         fn rejects_bech32m_checksum() {
             // Re-encode the upstream Ed25519 payload using the Bech32m
             // checksum variant. A correctly-implemented decoder must reject
-            // this, since the suipriv format uses BIP-173 Bech32 only.
+            // this, since the rtdpriv format uses BIP-173 Bech32 only.
             let bytes = ::bech32::primitives::decode::CheckedHrpstring::new::<::bech32::Bech32>(
-                UPSTREAM_ED25519_SUIPRIVKEY,
+                UPSTREAM_ED25519_RTDPRIVKEY,
             )
             .unwrap()
             .byte_iter()
             .collect::<Vec<_>>();
-            let hrp = ::bech32::Hrp::parse("suiprivkey").unwrap();
+            let hrp = ::bech32::Hrp::parse("rtdprivkey").unwrap();
             let bech32m = ::bech32::encode::<::bech32::Bech32m>(hrp, &bytes).unwrap();
-            assert_ne!(bech32m, UPSTREAM_ED25519_SUIPRIVKEY);
+            assert_ne!(bech32m, UPSTREAM_ED25519_RTDPRIVKEY);
 
-            SimpleKeypair::from_suiprivkey(&bech32m).unwrap_err();
-            Ed25519PrivateKey::from_suiprivkey(&bech32m).unwrap_err();
+            SimpleKeypair::from_rtdprivkey(&bech32m).unwrap_err();
+            Ed25519PrivateKey::from_rtdprivkey(&bech32m).unwrap_err();
         }
     }
 
     // Round-trip and rejection tests for the legacy Base64 keystore format.
     //
     // The payload is the same `flag || private_key` bytes as the Bech32
-    // `suiprivkey` format, encoded as plain Base64 instead. This is the
+    // `rtdprivkey` format, encoded as plain Base64 instead. This is the
     // encoding used for entries of the Rtd CLI's `rtd.keystore` file.
     mod base64 {
         use super::*;
@@ -1223,12 +1223,12 @@ mod test {
 
         #[cfg(feature = "bech32")]
         #[test]
-        fn agrees_with_suiprivkey_encoding() {
+        fn agrees_with_rtdprivkey_encoding() {
             // Both encodings carry the same payload, so converting between
             // them must be lossless.
             let keypair = SimpleKeypair::from_base64(UPSTREAM_ED25519_BASE64).unwrap();
-            let suiprivkey = keypair.to_suiprivkey().unwrap();
-            let round_tripped = SimpleKeypair::from_suiprivkey(&suiprivkey).unwrap();
+            let rtdprivkey = keypair.to_rtdprivkey().unwrap();
+            let round_tripped = SimpleKeypair::from_rtdprivkey(&rtdprivkey).unwrap();
             assert_eq!(round_tripped.to_base64(), UPSTREAM_ED25519_BASE64);
         }
 

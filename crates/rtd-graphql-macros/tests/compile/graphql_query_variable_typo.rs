@@ -4,7 +4,7 @@
 use rtd_graphql_macros::graphql_query;
 
 const Q: &str = graphql_query!(
-    "query($id: SuiAddress!) {
+    "query($id: RtdAddress!) {
         object(address: $idd) {
             version
         }

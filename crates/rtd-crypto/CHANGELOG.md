@@ -6,9 +6,9 @@
 # [0.3.1] - 2026-07-16
 
 ## Added
-- [#254] `from_suiprivkey` and `to_suiprivkey` on `SimpleKeypair`,
+- [#254] `from_rtdprivkey` and `to_rtdprivkey` on `SimpleKeypair`,
   `Ed25519PrivateKey`, `Secp256k1PrivateKey`, and `Secp256r1PrivateKey` for
-  the Rtd CLI's `suiprivkey` Bech32 key format, behind the new `bech32`
+  the Rtd CLI's `rtdprivkey` Bech32 key format, behind the new `bech32`
   feature
 - [#281] `from_base64` and `to_base64` on the same key types for the legacy
   Base64 keystore key format (available whenever the corresponding key scheme
@@ -88,7 +88,7 @@
 ## Added
 
 - Added support for multisig verification and aggregation ([#25])
-- Added blanket implementation for SuiSigner and SuiVerifier ([`bc481a1`])
+- Added blanket implementation for RtdSigner and RtdVerifier ([`bc481a1`])
 - Added support for der and pem format for public and private keys ([`df32a46`])
 - Added a `SimpleKeypair` type which could be either an ed25519, secp256k1, or secp256r1 keypair ([`8d64c06`])
 - Added support for verifying passkey authenticators ([#81])

@@ -5,7 +5,7 @@ use proto::ledger_service_server::LedgerServiceServer;
 use rtd_rpc::Client;
 use rtd_rpc::client::HeadersInterceptor;
 use rtd_rpc::headers::MAX_PROTOCOL_VERSION;
-use rtd_rpc::headers::X_SUI_CLIENT_PROTOCOL_VERSION;
+use rtd_rpc::headers::X_RTD_CLIENT_PROTOCOL_VERSION;
 use rtd_rpc::proto::rtd::rpc::v2 as proto;
 
 /// Echoes the received header back as `server`.
@@ -20,7 +20,7 @@ impl LedgerService for MockServer {
         let mut info = proto::GetServiceInfoResponse::default();
         info.server = request
             .metadata()
-            .get(X_SUI_CLIENT_PROTOCOL_VERSION)
+            .get(X_RTD_CLIENT_PROTOCOL_VERSION)
             .map(|v| v.to_str().unwrap().to_owned());
         Ok(tonic::Response::new(info))
     }
@@ -60,7 +60,7 @@ async fn configured_headers_override_protocol_version() {
         let mut headers = HeadersInterceptor::new();
         headers
             .headers_mut()
-            .insert(X_SUI_CLIENT_PROTOCOL_VERSION, "7".parse().unwrap());
+            .insert(X_RTD_CLIENT_PROTOCOL_VERSION, "7".parse().unwrap());
         Client::new(uri).expect("client").with_headers(headers)
     })
     .await;

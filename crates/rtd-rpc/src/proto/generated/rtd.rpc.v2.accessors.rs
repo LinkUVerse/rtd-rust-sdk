@@ -14940,7 +14940,7 @@ mod _accessor_impls {
                 pool_token_balance: None,
                 exchange_rates: None,
                 pending_stake: None,
-                pending_total_sui_withdraw: None,
+                pending_total_rtd_withdraw: None,
                 pending_pool_token_withdraw: None,
                 extra_fields: None,
             }
@@ -15030,12 +15030,12 @@ mod _accessor_impls {
             self.rtd_balance.as_ref().map(|field| *field)
         }
         ///Sets `rtd_balance` with the provided value.
-        pub fn set_sui_balance(&mut self, field: u64) {
+        pub fn set_rtd_balance(&mut self, field: u64) {
             self.rtd_balance = Some(field);
         }
         ///Sets `rtd_balance` with the provided value.
-        pub fn with_sui_balance(mut self, field: u64) -> Self {
-            self.set_sui_balance(field);
+        pub fn with_rtd_balance(mut self, field: u64) -> Self {
+            self.set_rtd_balance(field);
             self
         }
         ///If `rewards_pool` is set, returns [`Some`] with a mutable reference to the value; otherwise returns [`None`].
@@ -15136,26 +15136,26 @@ mod _accessor_impls {
             self.set_pending_stake(field);
             self
         }
-        ///If `pending_total_sui_withdraw` is set, returns [`Some`] with a mutable reference to the value; otherwise returns [`None`].
-        pub fn pending_total_sui_withdraw_opt_mut(&mut self) -> Option<&mut u64> {
-            self.pending_total_sui_withdraw.as_mut().map(|field| field as _)
+        ///If `pending_total_rtd_withdraw` is set, returns [`Some`] with a mutable reference to the value; otherwise returns [`None`].
+        pub fn pending_total_rtd_withdraw_opt_mut(&mut self) -> Option<&mut u64> {
+            self.pending_total_rtd_withdraw.as_mut().map(|field| field as _)
         }
-        ///Returns a mutable reference to `pending_total_sui_withdraw`.
+        ///Returns a mutable reference to `pending_total_rtd_withdraw`.
         ///If the field is unset, it is first initialized with the default value.
-        pub fn pending_total_sui_withdraw_mut(&mut self) -> &mut u64 {
-            self.pending_total_sui_withdraw.get_or_insert_default()
+        pub fn pending_total_rtd_withdraw_mut(&mut self) -> &mut u64 {
+            self.pending_total_rtd_withdraw.get_or_insert_default()
         }
-        ///If `pending_total_sui_withdraw` is set, returns [`Some`] with the value; otherwise returns [`None`].
-        pub fn pending_total_sui_withdraw_opt(&self) -> Option<u64> {
-            self.pending_total_sui_withdraw.as_ref().map(|field| *field)
+        ///If `pending_total_rtd_withdraw` is set, returns [`Some`] with the value; otherwise returns [`None`].
+        pub fn pending_total_rtd_withdraw_opt(&self) -> Option<u64> {
+            self.pending_total_rtd_withdraw.as_ref().map(|field| *field)
         }
-        ///Sets `pending_total_sui_withdraw` with the provided value.
-        pub fn set_pending_total_sui_withdraw(&mut self, field: u64) {
-            self.pending_total_sui_withdraw = Some(field);
+        ///Sets `pending_total_rtd_withdraw` with the provided value.
+        pub fn set_pending_total_rtd_withdraw(&mut self, field: u64) {
+            self.pending_total_rtd_withdraw = Some(field);
         }
-        ///Sets `pending_total_sui_withdraw` with the provided value.
-        pub fn with_pending_total_sui_withdraw(mut self, field: u64) -> Self {
-            self.set_pending_total_sui_withdraw(field);
+        ///Sets `pending_total_rtd_withdraw` with the provided value.
+        pub fn with_pending_total_rtd_withdraw(mut self, field: u64) -> Self {
+            self.set_pending_total_rtd_withdraw(field);
             self
         }
         ///If `pending_pool_token_withdraw` is set, returns [`Some`] with a mutable reference to the value; otherwise returns [`None`].

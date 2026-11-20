@@ -308,7 +308,7 @@ message StakingPool {
   optional uint64 deactivation_epoch = 3;
 
   // The total number of RTD tokens in this pool, including the RTD in the rewards_pool, as well as in all the principal
-  // in the `StakedSui` object, updated at epoch boundaries.
+  // in the `StakedRtd` object, updated at epoch boundaries.
   optional uint64 rtd_balance = 4;
 
   // The epoch stake rewards will be added here at the end of each epoch.
@@ -330,7 +330,7 @@ message StakingPool {
 
   // Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
   // This includes both the principal and rewards RTD withdrawn.
-  optional uint64 pending_total_sui_withdraw = 9;
+  optional uint64 pending_total_rtd_withdraw = 9;
 
   // Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
   optional uint64 pending_pool_token_withdraw = 10;

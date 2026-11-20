@@ -556,7 +556,7 @@ impl Client {
                 .map_request(move |mut req: http::Request<Body>| {
                     // Inserted before the configured headers so a caller can override it.
                     req.headers_mut().insert(
-                        crate::headers::X_SUI_CLIENT_PROTOCOL_VERSION,
+                        crate::headers::X_RTD_CLIENT_PROTOCOL_VERSION,
                         http::HeaderValue::from(crate::headers::MAX_PROTOCOL_VERSION),
                     );
                     if !headers.headers().is_empty() {

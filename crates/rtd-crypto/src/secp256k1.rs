@@ -131,23 +131,23 @@ impl Secp256k1PrivateKey {
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Decode a Bech32 `suiprivkey` string produced by the Rtd CLI.
+    /// Decode a Bech32 `rtdprivkey` string produced by the Rtd CLI.
     ///
-    /// Returns an error if the string does not have the `suiprivkey` HRP, has
+    /// Returns an error if the string does not have the `rtdprivkey` HRP, has
     /// an invalid Bech32 (BIP-173) checksum, has a flag byte that is not
     /// Secp256k1, has the wrong number of key bytes, or carries bytes that do
     /// not form a valid secp256k1 scalar.
-    pub fn from_suiprivkey(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode(s)?;
+    pub fn from_rtdprivkey(s: &str) -> Result<Self, SignatureError> {
+        let (scheme, key) = crate::rtdpriv::decode(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
     #[cfg(feature = "bech32")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "bech32")))]
-    /// Encode this private key as a Bech32 `suiprivkey` string.
-    pub fn to_suiprivkey(&self) -> Result<String, SignatureError> {
+    /// Encode this private key as a Bech32 `rtdprivkey` string.
+    pub fn to_rtdprivkey(&self) -> Result<String, SignatureError> {
         let bytes = self.0.to_bytes();
-        crate::suipriv::encode(SignatureScheme::Secp256k1, &bytes)
+        crate::rtdpriv::encode(SignatureScheme::Secp256k1, &bytes)
     }
 
     /// Decode a Base64 `flag || private_key` string, the legacy keystore
@@ -157,7 +157,7 @@ impl Secp256k1PrivateKey {
     /// that is not Secp256k1, has the wrong number of key bytes, or carries
     /// bytes that do not form a valid secp256k1 scalar.
     pub fn from_base64(s: &str) -> Result<Self, SignatureError> {
-        let (scheme, key) = crate::suipriv::decode_base64(s)?;
+        let (scheme, key) = crate::rtdpriv::decode_base64(s)?;
         Self::from_flagged_key_bytes(scheme, key)
     }
 
@@ -166,7 +166,7 @@ impl Secp256k1PrivateKey {
     /// `rtd.keystore` file.
     pub fn to_base64(&self) -> String {
         let bytes = self.0.to_bytes();
-        crate::suipriv::encode_base64(SignatureScheme::Secp256k1, &bytes)
+        crate::rtdpriv::encode_base64(SignatureScheme::Secp256k1, &bytes)
     }
 }
 
@@ -328,8 +328,8 @@ impl Verifier<UserSignature> for Secp256k1Verifier {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::SuiSigner;
-    use crate::SuiVerifier;
+    use crate::RtdSigner;
+    use crate::RtdVerifier;
     use rtd_sdk_types::PersonalMessage;
     use test_strategy::proptest;
 

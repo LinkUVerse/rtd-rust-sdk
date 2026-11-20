@@ -47,7 +47,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($id: SuiAddress!) {
+            "query($id: RtdAddress!) {
                 object(address: $id) {
                     objectBcs
                 }
@@ -74,7 +74,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($id: SuiAddress!, $version: UInt53) {
+            "query($id: RtdAddress!, $version: UInt53) {
                 object(address: $id, version: $version) {
                     objectBcs
                 }
@@ -106,7 +106,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($id: SuiAddress!, $atCheckpoint: UInt53) {
+            "query($id: RtdAddress!, $atCheckpoint: UInt53) {
                 object(address: $id, atCheckpoint: $atCheckpoint) {
                     objectBcs
                 }
@@ -140,7 +140,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($id: SuiAddress!, $rootVersion: UInt53) {
+            "query($id: RtdAddress!, $rootVersion: UInt53) {
                 object(address: $id, rootVersion: $rootVersion) {
                     objectBcs
                 }
@@ -204,7 +204,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($owner: SuiAddress!, $after: String) {
+            "query($owner: RtdAddress!, $after: String) {
                 objects(filter: { owner: $owner }, after: $after) {
                     pageInfo {
                         hasNextPage

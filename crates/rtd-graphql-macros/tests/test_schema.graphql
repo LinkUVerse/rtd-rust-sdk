@@ -3,7 +3,7 @@
 
 type Query {
     chainIdentifier: String
-    object(id: SuiAddress!): Object
+    object(id: RtdAddress!): Object
     epoch: Epoch
     checkpoint: Checkpoint
     checkpoints: CheckpointConnection
@@ -13,7 +13,7 @@ type Query {
 }
 
 type Object {
-    address: SuiAddress
+    address: RtdAddress
     version: Int
 }
 
@@ -65,12 +65,12 @@ type MoveValue {
 
 type MoveObject {
     contents: MoveValue
-    address: SuiAddress
+    address: RtdAddress
 }
 
 union DynamicFieldValue = MoveObject | MoveValue
 
-scalar SuiAddress
+scalar RtdAddress
 scalar Int
 scalar String
 scalar JSON

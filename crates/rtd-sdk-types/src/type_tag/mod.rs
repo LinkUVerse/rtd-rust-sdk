@@ -297,11 +297,11 @@ impl StructTag {
         }
     }
 
-    pub fn staked_sui() -> Self {
+    pub fn staked_rtd() -> Self {
         Self {
             address: Address::THREE,
             module: Identifier::new("staking_pool").unwrap(),
-            name: Identifier::new("StakedSui").unwrap(),
+            name: Identifier::new("StakedRtd").unwrap(),
             type_params: vec![],
         }
     }

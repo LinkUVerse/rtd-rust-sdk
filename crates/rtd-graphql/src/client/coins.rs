@@ -67,7 +67,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($owner: SuiAddress!, $coinType: String!) {
+            "query($owner: RtdAddress!, $coinType: String!) {
                 address(address: $owner) {
                     balance(coinType: $coinType) {
                         coinType {
@@ -147,7 +147,7 @@ impl Client {
         }
 
         const QUERY: &str = graphql_query!(
-            "query($owner: SuiAddress!, $after: String) {
+            "query($owner: RtdAddress!, $after: String) {
                 address(address: $owner) {
                     balances(after: $after) {
                         pageInfo {

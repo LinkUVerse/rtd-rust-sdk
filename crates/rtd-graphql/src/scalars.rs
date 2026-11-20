@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use serde::Deserialize;
 
-/// `SuiAddress` scalar in Rtd GraphQL schema. 32-byte hex-encoded address with `0x` prefix.
+/// `RtdAddress` scalar in Rtd GraphQL schema. 32-byte hex-encoded address with `0x` prefix.
 pub use rtd_sdk_types::Address;
 
 /// Useful for digest fields (Base58 string). Not a scalar in Rtd GraphQL schema.

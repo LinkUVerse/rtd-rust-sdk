@@ -28,7 +28,7 @@ secp256r1 = ["dep:p256", "dep:rand_core"]
 passkey = ["secp256r1", "dep:sha2"]
 secp256k1 = ["dep:k256", "dep:rand_core", "signature/std"]
 mldsa65 = [
-    "dep:mysten-mldsa-native-rs",
+    "dep:linku-mldsa-native-rs",
     "dep:rand_core",
     "signature/std",
     "signature/rand_core",
@@ -59,7 +59,7 @@ pem = [
 ]
 bls12381 = ["dep:blst", "dep:rand_core", "signature/std"]
 
-# Loading and storing private keys in the `suiprivkey` Bech32 format produced
+# Loading and storing private keys in the `rtdprivkey` Bech32 format produced
 # by the Rtd CLI. Pulls in the `bech32` dependency. Useful only when at least
 # one of `ed25519`, `secp256k1`, or `secp256r1` is also enabled.
 bech32 = ["dep:bech32"]
@@ -78,7 +78,7 @@ rand_core = { version = "0.6.4", optional = true }
 ed25519-dalek = { version = "2.2.0", optional = true }
 
 # ML-DSA-65 support: the same mldsa-native build Rtd validators run.
-mysten-mldsa-native-rs = { version = "0.2.0", optional = true }
+linku-mldsa-native-rs = { package = "mysten-mldsa-native-rs", version = "0.2.0", optional = true }
 
 # secp256r1 support
 p256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "std"], optional = true }
@@ -108,7 +108,7 @@ pem-rfc7468 = { version = "0.7", optional = true, features = ["std"] }
 # bls12381 support
 blst = { version = "0.3.13", optional = true }
 
-# suiprivkey (Bech32) support.
+# rtdprivkey (Bech32) support.
 bech32 = { version = "0.11", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]

@@ -10738,7 +10738,7 @@ pub(crate) mod _field_impls {
         };
         pub const RTD_BALANCE_FIELD: &'static MessageField = &MessageField {
             name: "rtd_balance",
-            json_name: "suiBalance",
+            json_name: "rtdBalance",
             number: 4i32,
             message_fields: None,
         };
@@ -10766,9 +10766,9 @@ pub(crate) mod _field_impls {
             number: 8i32,
             message_fields: None,
         };
-        pub const PENDING_TOTAL_SUI_WITHDRAW_FIELD: &'static MessageField = &MessageField {
-            name: "pending_total_sui_withdraw",
-            json_name: "pendingTotalSuiWithdraw",
+        pub const PENDING_TOTAL_RTD_WITHDRAW_FIELD: &'static MessageField = &MessageField {
+            name: "pending_total_rtd_withdraw",
+            json_name: "pendingTotalRtdWithdraw",
             number: 9i32,
             message_fields: None,
         };
@@ -10795,7 +10795,7 @@ pub(crate) mod _field_impls {
             Self::POOL_TOKEN_BALANCE_FIELD,
             Self::EXCHANGE_RATES_FIELD,
             Self::PENDING_STAKE_FIELD,
-            Self::PENDING_TOTAL_SUI_WITHDRAW_FIELD,
+            Self::PENDING_TOTAL_RTD_WITHDRAW_FIELD,
             Self::PENDING_POOL_TOKEN_WITHDRAW_FIELD,
             Self::EXTRA_FIELDS_FIELD,
         ];
@@ -10852,8 +10852,8 @@ pub(crate) mod _field_impls {
             self.path.push(StakingPool::PENDING_STAKE_FIELD.name);
             self.finish()
         }
-        pub fn pending_total_sui_withdraw(mut self) -> String {
-            self.path.push(StakingPool::PENDING_TOTAL_SUI_WITHDRAW_FIELD.name);
+        pub fn pending_total_rtd_withdraw(mut self) -> String {
+            self.path.push(StakingPool::PENDING_TOTAL_RTD_WITHDRAW_FIELD.name);
             self.finish()
         }
         pub fn pending_pool_token_withdraw(mut self) -> String {
